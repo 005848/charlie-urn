@@ -1,0 +1,82 @@
+---
+import Layout from '@layouts/Layout.astro';
+---
+
+<Layout title="登录 - 管理后台">
+  <main class="min-h-screen flex items-center justify-center px-4 bg-[#faf9f7]">
+    <div class="w-full max-w-md animate-fade-in">
+      <div class="text-center mb-12">
+        <h1 class="text-2xl font-serif text-[#2c2a28] mb-2">管理入口</h1>
+        <p class="text-sm text-[#9a9690]">请输入管理员密码</p>
+      </div>
+
+      <form id="login-form" class="space-y-6">
+        <div>
+          <input
+            type="password"
+            id="password"
+            placeholder="管理员密码"
+            class="w-full px-4 py-3 bg-white border border-[#e5e2dd] rounded-md text-[#2c2a28] placeholder-[#9a9690] focus:outline-none focus:border-[#b8977a] focus:ring-1 focus:ring-[#b8977a] transition-all duration-300"
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          id="submit-btn"
+          class="w-full py-3 bg-[#2c2a28] text-white rounded-md font-medium hover:bg-[#1a1918] transition-all duration-300 disabled:opacity-50"
+        >
+          进入
+        </button>
+        <p id="error-msg" class="text-center text-red-500 text-sm hidden"></p>
+      </form>
+
+      <p class="text-center text-xs text-[#9a9690] mt-8">
+        <a href="/" class="hover:text-[#b8977a] transition-colors duration-300">← 返回首页</a>
+      </p>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  const form = document.getElementById('login-form') as HTMLFormElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+  const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const password = (document.getElementById('password') as HTMLInputElement).value;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = '验证中...';
+    errorMsg.classList.add('hidden');
+
+    try {
+      const res = await fetch('/api/admin/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.token) {
+        localStorage.setItem('charlie_admin_token', data.token);
+        window.location.href = '/admin';
+      } else {
+        errorMsg.textContent = data.error || '登录失败';
+        errorMsg.classList.remove('hidden');
+      }
+    } catch {
+      errorMsg.textContent = '网络错误，请重试';
+      errorMsg.classList.remove('hidden');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '进入';
+    }
+  });
+
+  // 已登录直接跳转
+  if (localStorage.getItem('charlie_admin_token')) {
+    window.location.href = '/admin';
+  }
+</script>

@@ -1,31 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import PostCard from '../../components/PostCard.astro';
 import { CATEGORIES } from '../../consts';
-import { getCollection } from 'astro:content';
-
-const posts = (await getCollection('blog', ({ data }) => !data.draft))
-  .sort((a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime());
-
-// 按年份分组
-const postsByYear = new Map<string, typeof posts>();
-for (const post of posts) {
-  const year = post.data.pubDate.getFullYear().toString();
-  if (!postsByYear.has(year)) {
-    postsByYear.set(year, []);
-  }
-  postsByYear.get(year)!.push(post);
-}
-
-// 将 posts 数据序列化为 JSON 供前端筛选使用
-const postsData = posts.map((post) => ({
-  slug: post.slug,
-  title: post.data.title,
-  description: post.data.description,
-  pubDate: post.data.pubDate.toISOString(),
-  category: post.data.category,
-  tags: post.data.tags || [],
-}));
 ---
 
 <Layout title="目录" description="所有文章与记忆的目录">
@@ -33,7 +8,7 @@ const postsData = posts.map((post) => ({
     <div class="archive-header">
       <span class="header-mark">◇ ◇ ◇</span>
       <h1 class="archive-title">记忆目录</h1>
-      <p class="archive-subtitle">共 {posts.length} 篇文字，按时间倒序排列</p>
+      <p class="archive-subtitle"><span id="post-count">—</span> 篇文字，按时间倒序排列</p>
     </div>
 
     <!-- 搜索框 -->
@@ -50,8 +25,8 @@ const postsData = posts.map((post) => ({
     </div>
 
     <!-- 分类筛选 -->
-    <div class="category-filter">
-      {CATEGORIES.map((cat) => (
+    <div class="category-filter" id="category-filter">
+      {CATEGORIES.map((cat, index) => (
         <button
           class:list={['category-btn', { active: cat.id === 'all' }]}
           data-category={cat.id}
@@ -76,39 +51,20 @@ const postsData = posts.map((post) => ({
 
     <!-- 列表视图 -->
     <div class="posts-container list-view" id="postsContainer">
-      {Array.from(postsByYear.entries()).map(([year, yearPosts]) => (
-        <div class="year-group" data-year={year}>
-          <h2 class="year-title">
-            <span class="year-num">{year}</span>
-            <span class="year-count">{yearPosts.length} 篇</span>
-          </h2>
-          <div class="year-posts">
-            {yearPosts.map((post) => (
-              <PostCard post={post} />
-            ))}
-          </div>
-        </div>
-      ))}
+      <p class="text-center text-[#9a9690] text-sm py-12">加载中...</p>
     </div>
 
     <!-- 时间线视图 -->
     <div class="posts-container timeline-view" id="timelineView" style="display: none;">
       <div class="timeline-line"></div>
-      {posts.map((post, index) => (
-        <div class="timeline-item" data-category={post.data.category}>
-          <div class="timeline-dot">
-            <span class="dot-inner"></span>
-          </div>
-          <div class="timeline-content">
-            <a href={`/blog/${post.slug}`} class="timeline-link">
-              <span class="timeline-date">
-                {post.data.pubDate.getMonth() + 1}月{post.data.pubDate.getDate()}日
-              </span>
-              <span class="timeline-title">{post.data.title}</span>
-            </a>
-          </div>
-        </div>
-      ))}
+      <div id="timeline-items"></div>
+    </div>
+
+    <!-- 加载更多 -->
+    <div class="load-more-container" id="load-more-container" style="display: none;">
+      <button id="load-more-btn" class="load-more-btn">
+        加载更多
+      </button>
     </div>
 
     <!-- 无结果提示 -->
@@ -119,6 +75,215 @@ const postsData = posts.map((post) => ({
     </div>
   </section>
 </Layout>
+
+<script>
+  import { CATEGORIES } from '../../consts';
+
+  const categoryLabels: Record<string, string> = {};
+  for (const cat of CATEGORIES) {
+    categoryLabels[cat.id] = cat.label;
+  }
+
+  let currentCategory = 'all';
+  let currentSearch = '';
+  let currentPage = 1;
+  const pageSize = 20;
+  let totalPosts = 0;
+  let allPosts: any[] = [];
+  let loading = false;
+
+  const postsContainer = document.getElementById('postsContainer')!;
+  const timelineItems = document.getElementById('timeline-items')!;
+  const noResults = document.getElementById('noResults')!;
+  const loadMoreContainer = document.getElementById('load-more-container')!;
+  const loadMoreBtn = document.getElementById('load-more-btn')!;
+  const postCountEl = document.getElementById('post-count')!;
+
+  async function loadPosts(reset = false) {
+    if (loading) return;
+    if (reset) {
+      currentPage = 1;
+      allPosts = [];
+      postsContainer.innerHTML = '<p class="text-center text-[#9a9690] text-sm py-12">加载中...</p>';
+      timelineItems.innerHTML = '';
+    }
+
+    loading = true;
+    loadMoreBtn.textContent = '加载中...';
+    loadMoreBtn.disabled = true;
+
+    try {
+      let url = `/api/posts?page=${currentPage}&pageSize=${pageSize}`;
+      if (currentCategory && currentCategory !== 'all') url += `&category=${currentCategory}`;
+      if (currentSearch) url += `&search=${encodeURIComponent(currentSearch)}`;
+
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.success) {
+        const posts = data.data || [];
+        totalPosts = data.total || 0;
+        allPosts = reset ? posts : [...allPosts, ...posts];
+
+        postCountEl.textContent = String(totalPosts);
+
+        if (allPosts.length === 0) {
+          postsContainer.style.display = 'none';
+          document.getElementById('timelineView')!.style.display = 'none';
+          noResults.style.display = 'block';
+          loadMoreContainer.style.display = 'none';
+        } else {
+          noResults.style.display = 'none';
+          renderListView();
+          renderTimelineView();
+
+          const hasMore = allPosts.length < totalPosts;
+          loadMoreContainer.style.display = hasMore ? 'block' : 'none';
+          loadMoreBtn.textContent = '加载更多';
+          loadMoreBtn.disabled = !hasMore;
+        }
+      }
+    } catch (err) {
+      postsContainer.innerHTML = '<p class="text-center text-[#9a9690] text-sm py-12">加载失败，请刷新重试</p>';
+    } finally {
+      loading = false;
+    }
+  }
+
+  function renderListView() {
+    // 按年份分组
+    const byYear = new Map<string, any[]>();
+    for (const post of allPosts) {
+      const year = new Date(post.pub_date).getFullYear().toString();
+      if (!byYear.has(year)) byYear.set(year, []);
+      byYear.get(year)!.push(post);
+    }
+
+    let html = '';
+    for (const [year, yearPosts] of Array.from(byYear.entries())) {
+      html += `
+        <div class="year-group" data-year="${year}">
+          <h2 class="year-title">
+            <span class="year-num">${year}</span>
+            <span class="year-count">${yearPosts.length} 篇</span>
+          </h2>
+          <div class="year-posts">
+            ${yearPosts.map(post => renderPostCard(post)).join('')}
+          </div>
+        </div>
+      `;
+    }
+    postsContainer.innerHTML = html;
+  }
+
+  function renderPostCard(post: any): string {
+    const date = new Date(post.pub_date);
+    const dateStr = `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+    const catLabel = categoryLabels[post.category] || post.category;
+    const tagsHtml = (post.tags || []).slice(0, 3).map((t: string) =>
+      `<span class="post-tag">${escapeHtml(t)}</span>`
+    ).join('');
+
+    return `
+      <a href="/blog/${post.slug}" class="post-card animate-fade-in-up">
+        <div class="post-card-meta">
+          <span class="post-card-category">${catLabel}</span>
+          <span class="post-card-date">${dateStr}</span>
+        </div>
+        <h3 class="post-card-title">${escapeHtml(post.title)}</h3>
+        <p class="post-card-excerpt">${escapeHtml(post.description || '')}</p>
+        ${tagsHtml ? `<div class="post-card-tags">${tagsHtml}</div>` : ''}
+        <div class="post-card-footer">
+          <span class="read-more">阅读全文 →</span>
+        </div>
+      </a>
+    `;
+  }
+
+  function renderTimelineView() {
+    const html = allPosts.map((post, index) => {
+      const date = new Date(post.pub_date);
+      return `
+        <div class="timeline-item" data-category="${post.category}" style="animation-delay: ${index * 30}ms">
+          <div class="timeline-dot">
+            <span class="dot-inner"></span>
+          </div>
+          <div class="timeline-content">
+            <a href="/blog/${post.slug}" class="timeline-link">
+              <span class="timeline-date">
+                ${date.getMonth() + 1}月${date.getDate()}日
+              </span>
+              <span class="timeline-title">${escapeHtml(post.title)}</span>
+            </a>
+          </div>
+        </div>
+      `;
+    }).join('');
+    timelineItems.innerHTML = html;
+  }
+
+  function escapeHtml(str: string): string {
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+
+  // 分类切换
+  document.querySelectorAll<HTMLButtonElement>('.category-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentCategory = btn.dataset.category || 'all';
+      loadPosts(true);
+    });
+  });
+
+  // 视图切换
+  document.querySelectorAll<HTMLButtonElement>('.view-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const view = btn.dataset.view || 'list';
+      document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      if (view === 'timeline') {
+        postsContainer.style.display = 'none';
+        document.getElementById('timelineView')!.style.display = 'block';
+      } else {
+        postsContainer.style.display = 'block';
+        document.getElementById('timelineView')!.style.display = 'none';
+      }
+    });
+  });
+
+  // 搜索防抖
+  let searchTimer: ReturnType<typeof setTimeout>;
+  document.getElementById('searchInput')?.addEventListener('input', (e) => {
+    clearTimeout(searchTimer);
+    const val = (e.target as HTMLInputElement).value.trim();
+    searchTimer = setTimeout(() => {
+      currentSearch = val;
+      loadPosts(true);
+    }, 300);
+  });
+
+  // 加载更多
+  loadMoreBtn.addEventListener('click', () => {
+    currentPage++;
+    loadPosts(false);
+  });
+
+  // URL 参数初始化
+  const urlParams = new URLSearchParams(window.location.search);
+  const catParam = urlParams.get('category');
+  if (catParam && CATEGORIES.some(c => c.id === catParam)) {
+    currentCategory = catParam;
+    document.querySelectorAll('.category-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.category === catParam);
+    });
+  }
+
+  loadPosts(true);
+</script>
 
 <style>
 .archive-page {
@@ -162,7 +327,7 @@ const postsData = posts.map((post) => ({
 
 .search-box {
   position: relative;
-  max-width: 480px;
+  max-width: 400px;
   margin: 0 auto;
 }
 
@@ -172,50 +337,53 @@ const postsData = posts.map((post) => ({
   top: 50%;
   transform: translateY(-50%);
   color: var(--color-text-tertiary);
-  font-size: 1rem;
+  font-size: 1.1rem;
 }
 
 .search-input {
   width: 100%;
-  padding: 12px 16px 12px 42px;
+  padding: 12px 16px 12px 44px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
-  background-color: var(--color-bg-primary);
-  color: var(--color-text-primary);
-  font-family: inherit;
+  background: white;
   font-size: 0.9rem;
-  transition: all 0.3s var(--ease-smooth);
-  outline: none;
+  color: var(--color-text-primary);
+  transition: all 0.3s ease;
+  font-family: inherit;
 }
 
 .search-input:focus {
+  outline: none;
   border-color: var(--color-accent-primary);
-  background-color: #fff;
   box-shadow: 0 0 0 3px rgba(184, 151, 122, 0.1);
+}
+
+.search-input::placeholder {
+  color: var(--color-text-quaternary, #c4c0b8);
 }
 
 /* Category Filter */
 .category-filter {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 8px;
+  justify-content: center;
   margin-bottom: 32px;
 }
 
 .category-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
+  padding: 8px 16px;
   border: 1px solid var(--color-border);
   border-radius: 20px;
-  background-color: transparent;
+  background: white;
+  font-size: 0.85rem;
   color: var(--color-text-secondary);
-  font-family: inherit;
-  font-size: 0.8rem;
   cursor: pointer;
-  transition: all 0.3s var(--ease-smooth);
+  transition: all 0.3s ease;
+  font-family: inherit;
 }
 
 .category-btn:hover {
@@ -224,13 +392,13 @@ const postsData = posts.map((post) => ({
 }
 
 .category-btn.active {
-  background-color: var(--color-accent-primary);
-  border-color: var(--color-accent-primary);
-  color: #fff;
+  background: var(--color-text-primary);
+  border-color: var(--color-text-primary);
+  color: white;
 }
 
 .cat-icon {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
 }
 
 /* View Toggle */
@@ -242,50 +410,137 @@ const postsData = posts.map((post) => ({
 }
 
 .view-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 4px;
   padding: 6px 12px;
   border: none;
-  background: none;
+  background: transparent;
+  font-size: 0.8rem;
   color: var(--color-text-tertiary);
-  font-family: inherit;
-  font-size: 0.75rem;
   cursor: pointer;
   border-radius: 6px;
-  transition: all 0.3s var(--ease-smooth);
+  transition: all 0.3s ease;
+  font-family: inherit;
 }
 
 .view-btn:hover {
   color: var(--color-text-secondary);
-  background-color: var(--color-bg-secondary);
+  background: var(--color-bg-secondary);
 }
 
 .view-btn.active {
-  color: var(--color-accent-primary);
-  background-color: rgba(184, 151, 122, 0.08);
+  color: var(--color-text-primary);
+  background: var(--color-bg-secondary);
 }
 
 .view-icon {
-  font-size: 0.9rem;
+  font-size: 1rem;
 }
 
-/* List View */
+/* Post Card */
+.post-card {
+  display: block;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--color-border-light, #eee);
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.post-card:last-child {
+  border-bottom: none;
+}
+
+.post-card:hover {
+  padding-left: 8px;
+}
+
+.post-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+  color: var(--color-text-tertiary);
+}
+
+.post-card-category {
+  color: var(--color-accent-primary);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+.post-card-date {
+  color: var(--color-text-quaternary, #c4c0b8);
+}
+
+.post-card-title {
+  font-size: 1.15rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: 6px;
+  line-height: 1.5;
+  transition: color 0.3s ease;
+}
+
+.post-card:hover .post-card-title {
+  color: var(--color-accent-primary);
+}
+
+.post-card-excerpt {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.post-card-tags {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.post-tag {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-secondary);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.post-card-footer {
+  font-size: 0.85rem;
+  color: var(--color-accent-primary);
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: all 0.3s ease;
+}
+
+.post-card:hover .post-card-footer {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.read-more {
+  font-size: 0.85rem;
+}
+
+/* Year Group */
 .year-group {
   margin-bottom: 48px;
-}
-
-.year-group:last-child {
-  margin-bottom: 0;
 }
 
 .year-title {
   display: flex;
   align-items: baseline;
   gap: 12px;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--color-border-soft);
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .year-num {
@@ -296,68 +551,67 @@ const postsData = posts.map((post) => ({
 }
 
 .year-count {
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: var(--color-text-tertiary);
 }
 
 /* Timeline View */
 .timeline-view {
   position: relative;
-  padding-left: 24px;
+  padding-left: 30px;
+  padding-top: 8px;
 }
 
 .timeline-line {
   position: absolute;
   left: 7px;
-  top: 8px;
-  bottom: 8px;
+  top: 0;
+  bottom: 0;
   width: 1px;
-  background: linear-gradient(
-    to bottom,
-    var(--color-accent-primary),
-    var(--color-border)
-  );
+  background: var(--color-border);
 }
 
 .timeline-item {
   position: relative;
-  padding-bottom: 24px;
-  display: flex;
-  gap: 16px;
-}
-
-.timeline-item:last-child {
-  padding-bottom: 0;
+  margin-bottom: 20px;
+  opacity: 0;
+  animation: fadeInUp 0.5s ease forwards;
 }
 
 .timeline-dot {
   position: absolute;
-  left: -24px;
-  top: 4px;
+  left: -30px;
+  top: 6px;
   width: 15px;
   height: 15px;
+  border-radius: 50%;
+  background: var(--color-bg-primary);
+  border: 2px solid var(--color-border);
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.timeline-item:hover .timeline-dot {
+  border-color: var(--color-accent-primary);
 }
 
 .dot-inner {
-  width: 8px;
-  height: 8px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  background-color: var(--color-bg-primary);
-  border: 2px solid var(--color-accent-primary);
-  transition: all 0.3s var(--ease-smooth);
+  background: var(--color-accent-primary);
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .timeline-item:hover .dot-inner {
-  background-color: var(--color-accent-primary);
-  transform: scale(1.2);
+  opacity: 1;
 }
 
 .timeline-content {
-  flex: 1;
+  padding-left: 4px;
 }
 
 .timeline-link {
@@ -365,44 +619,40 @@ const postsData = posts.map((post) => ({
   align-items: baseline;
   gap: 16px;
   text-decoration: none;
-  color: inherit;
-  padding: 4px 0;
-  transition: all 0.3s var(--ease-smooth);
+  transition: all 0.3s ease;
 }
 
-.timeline-link:hover {
-  padding-left: 8px;
-}
-
-.timeline-link:hover .timeline-title {
-  color: var(--color-accent-hover);
+.timeline-item:hover .timeline-link {
+  transform: translateX(4px);
 }
 
 .timeline-date {
   font-size: 0.8rem;
   color: var(--color-text-tertiary);
-  font-variant-numeric: tabular-nums;
   flex-shrink: 0;
-  width: 60px;
+  min-width: 60px;
 }
 
 .timeline-title {
   font-size: 0.95rem;
   color: var(--color-text-primary);
-  transition: color 0.3s var(--ease-smooth);
+  transition: color 0.3s ease;
+}
+
+.timeline-item:hover .timeline-title {
+  color: var(--color-accent-primary);
 }
 
 /* No Results */
 .no-results {
   text-align: center;
-  padding: 80px 24px;
+  padding: 60px 0;
 }
 
 .no-results-icon {
   font-size: 2rem;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-quaternary, #c4c0b8);
   margin-bottom: 16px;
-  opacity: 0.5;
 }
 
 .no-results-text {
@@ -416,189 +666,80 @@ const postsData = posts.map((post) => ({
   color: var(--color-text-tertiary);
 }
 
-.hidden {
-  display: none !important;
+/* Load More */
+.load-more-container {
+  text-align: center;
+  margin-top: 32px;
 }
 
+.load-more-btn {
+  padding: 10px 32px;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  background: white;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: inherit;
+}
+
+.load-more-btn:hover:not(:disabled) {
+  border-color: var(--color-accent-primary);
+  color: var(--color-accent-primary);
+}
+
+.load-more-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Responsive */
 @media (max-width: 640px) {
   .archive-page {
-    padding: 40px 16px;
+    padding: 40px 20px;
   }
 
   .archive-title {
-    font-size: 1.6rem;
+    font-size: 1.8rem;
   }
 
-  .timeline-date {
-    width: 50px;
-    font-size: 0.75rem;
+  .category-filter {
+    gap: 6px;
   }
 
-  .timeline-title {
-    font-size: 0.9rem;
+  .category-btn {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+  }
+
+  .view-toggle {
+    justify-content: center;
+  }
+
+  .timeline-view {
+    padding-left: 24px;
+  }
+
+  .timeline-line {
+    left: 5px;
+  }
+
+  .timeline-dot {
+    left: -24px;
+    width: 11px;
+    height: 11px;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 </style>
-
-<script>
-  const postsData = JSON.parse(
-    document.getElementById('postsData')?.textContent || '[]'
-  );
-
-  // 从 URL 参数获取初始分类
-  const urlParams = new URLSearchParams(window.location.search);
-  const initialCategory = urlParams.get('category') || 'all';
-
-  let currentCategory = initialCategory;
-  let currentView = 'list';
-  let searchQuery = '';
-
-  const categoryBtns = document.querySelectorAll('.category-btn');
-  const viewBtns = document.querySelectorAll('.view-btn');
-  const searchInput = document.getElementById('searchInput') as HTMLInputElement;
-  const listView = document.getElementById('postsContainer');
-  const timelineView = document.getElementById('timelineView');
-  const noResults = document.getElementById('noResults');
-
-  // 初始化分类按钮状态
-  categoryBtns.forEach((btn) => {
-    const cat = btn.getAttribute('data-category');
-    if (cat === currentCategory) {
-      btn.classList.add('active');
-    } else {
-      btn.classList.remove('active');
-    }
-  });
-
-  // 分类切换
-  categoryBtns.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const cat = btn.getAttribute('data-category');
-      if (!cat) return;
-
-      currentCategory = cat;
-
-      categoryBtns.forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-
-      filterPosts();
-    });
-  });
-
-  // 视图切换
-  viewBtns.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const view = btn.getAttribute('data-view');
-      if (!view || view === currentView) return;
-
-      currentView = view;
-
-      viewBtns.forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-
-      if (view === 'list') {
-        listView!.style.display = 'block';
-        timelineView!.style.display = 'none';
-      } else {
-        listView!.style.display = 'none';
-        timelineView!.style.display = 'block';
-      }
-    });
-  });
-
-  // 搜索
-  let searchTimeout: number;
-  searchInput?.addEventListener('input', (e) => {
-    const target = e.target as HTMLInputElement;
-    clearTimeout(searchTimeout);
-    searchTimeout = window.setTimeout(() => {
-      searchQuery = target.value.toLowerCase().trim();
-      filterPosts();
-    }, 200);
-  });
-
-  function filterPosts() {
-    const allYearGroups = document.querySelectorAll('.year-group');
-    const allTimelineItems = document.querySelectorAll('.timeline-item');
-    let visibleCount = 0;
-
-    // 列表视图过滤
-    allYearGroups.forEach((group) => {
-      const yearPosts = group.querySelector('.year-posts');
-      const cards = yearPosts?.querySelectorAll('.post-card') || [];
-      let yearVisible = 0;
-
-      cards.forEach((card) => {
-        const link = card.querySelector('a');
-        const href = link?.getAttribute('href') || '';
-        const slug = href.replace('/blog/', '');
-        const post = postsData.find((p: any) => p.slug === slug);
-
-        if (!post) {
-          (card as HTMLElement).style.display = 'block';
-          yearVisible++;
-          return;
-        }
-
-        const matchCategory =
-          currentCategory === 'all' || post.category === currentCategory;
-        const matchSearch =
-          !searchQuery ||
-          post.title.toLowerCase().includes(searchQuery) ||
-          post.description.toLowerCase().includes(searchQuery) ||
-          post.tags?.some((t: string) => t.toLowerCase().includes(searchQuery));
-
-        if (matchCategory && matchSearch) {
-          (card as HTMLElement).style.display = 'block';
-          yearVisible++;
-        } else {
-          (card as HTMLElement).style.display = 'none';
-        }
-      });
-
-      if (yearVisible > 0) {
-        (group as HTMLElement).style.display = 'block';
-        const countEl = group.querySelector('.year-count');
-        if (countEl) countEl.textContent = `${yearVisible} 篇`;
-        visibleCount += yearVisible;
-      } else {
-        (group as HTMLElement).style.display = 'none';
-      }
-    });
-
-    // 时间线视图过滤
-    allTimelineItems.forEach((item) => {
-      const category = item.getAttribute('data-category');
-      const titleEl = item.querySelector('.timeline-title');
-      const title = titleEl?.textContent?.toLowerCase() || '';
-
-      const matchCategory =
-        currentCategory === 'all' || category === currentCategory;
-      const matchSearch = !searchQuery || title.includes(searchQuery);
-
-      if (matchCategory && matchSearch) {
-        (item as HTMLElement).style.display = 'flex';
-      } else {
-        (item as HTMLElement).style.display = 'none';
-      }
-    });
-
-    // 无结果提示
-    const timelineVisible = Array.from(allTimelineItems).filter(
-      (item) => (item as HTMLElement).style.display !== 'none'
-    ).length;
-
-    const totalVisible = currentView === 'list' ? visibleCount : timelineVisible;
-
-    if (noResults) {
-      noResults.style.display = totalVisible === 0 ? 'block' : 'none';
-    }
-  }
-
-  // 初始过滤
-  filterPosts();
-
-  // 嵌入数据
-</script>
-
-<script type="application/json" id="postsData">{postsData}</script>

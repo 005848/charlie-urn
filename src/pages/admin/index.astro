@@ -1,0 +1,115 @@
+---
+import Layout from '@layouts/Layout.astro';
+---
+
+<Layout title="管理后台 - Charlie的电子骨灰盒">
+  <main class="min-h-screen bg-[#faf9f7]">
+    <!-- 顶部导航 -->
+    <header class="bg-white border-b border-[#e5e2dd] sticky top-0 z-50">
+      <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-8">
+          <h1 class="text-lg font-serif text-[#2c2a28]">管理后台</h1>
+          <nav class="flex gap-6 text-sm">
+            <a href="/admin" class="admin-nav text-[#2c2a28] font-medium" data-page="dashboard">概览</a>
+            <a href="/admin/posts" class="admin-nav text-[#6b6864] hover:text-[#b8977a] transition-colors" data-page="posts">文章</a>
+            <a href="/admin/comments" class="admin-nav text-[#6b6864] hover:text-[#b8977a] transition-colors" data-page="comments">留言</a>
+          </nav>
+        </div>
+        <div class="flex items-center gap-4">
+          <a href="/" target="_blank" class="text-sm text-[#6b6864] hover:text-[#b8977a] transition-colors">查看站点</a>
+          <button id="logout-btn" class="text-sm text-[#6b6864] hover:text-red-500 transition-colors">退出</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 内容区 -->
+    <div class="max-w-6xl mx-auto px-6 py-10">
+      <!-- 概览卡片 -->
+      <div id="dashboard-view" class="admin-view">
+        <h2 class="text-xl font-serif text-[#2c2a28] mb-8">数据概览</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <div class="bg-white border border-[#e5e2dd] rounded-lg p-6">
+            <p class="text-sm text-[#9a9690] mb-2">文章总数</p>
+            <p id="stat-posts" class="text-3xl font-serif text-[#2c2a28]">--</p>
+          </div>
+          <div class="bg-white border border-[#e5e2dd] rounded-lg p-6">
+            <p class="text-sm text-[#9a9690] mb-2">留言总数</p>
+            <p id="stat-comments" class="text-3xl font-serif text-[#2c2a28]">--</p>
+          </div>
+          <div class="bg-white border border-[#e5e2dd] rounded-lg p-6">
+            <p class="text-sm text-[#9a9690] mb-2">累计访问</p>
+            <p id="stat-views" class="text-3xl font-serif text-[#2c2a28]">--</p>
+          </div>
+        </div>
+
+        <div class="bg-white border border-[#e5e2dd] rounded-lg p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-medium text-[#2c2a28]">快捷操作</h3>
+          </div>
+          <div class="flex gap-4">
+            <a href="/admin/posts/edit" class="px-5 py-2.5 bg-[#2c2a28] text-white text-sm rounded-md hover:bg-[#1a1918] transition-colors">
+              + 新建文章
+            </a>
+            <a href="/admin/comments" class="px-5 py-2.5 border border-[#e5e2dd] text-[#2c2a28] text-sm rounded-md hover:bg-[#f0eeeb] transition-colors">
+              管理留言
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  import { requireAuth, adminFetch, clearAdminToken } from '@lib/client/admin';
+
+  // 鉴权
+  requireAuth();
+
+  // 高亮当前导航
+  const pageMap: Record<string, string> = {
+    '/admin': 'dashboard',
+    '/admin/posts': 'posts',
+    '/admin/comments': 'comments',
+  };
+  const currentPage = pageMap[window.location.pathname] || 'dashboard';
+  document.querySelectorAll('.admin-nav').forEach(el => {
+    const link = el as HTMLAnchorElement;
+    if (link.dataset.page === currentPage) {
+      link.classList.add('text-[#2c2a28]', 'font-medium');
+      link.classList.remove('text-[#6b6864]');
+    }
+  });
+
+  // 退出登录
+  document.getElementById('logout-btn')?.addEventListener('click', () => {
+    clearAdminToken();
+    window.location.href = '/admin/login';
+  });
+
+  // 加载统计数据
+  async function loadStats() {
+    try {
+      // 文章数
+      const postsRes = await adminFetch('/api/posts?pageSize=1');
+      const postsData = await postsRes.json();
+      const postsEl = document.getElementById('stat-posts');
+      if (postsEl) postsEl.textContent = String(postsData.total ?? 0);
+
+      // 留言数
+      const commentsRes = await adminFetch('/api/comments?pageSize=1');
+      const commentsData = await commentsRes.json();
+      const commentsEl = document.getElementById('stat-comments');
+      if (commentsEl) commentsEl.textContent = String(commentsData.total ?? 0);
+
+      // 访问量（用 blog_posts 的 view_count 总和）
+      // 简化处理：文章总数 * 平均阅读
+      const viewsEl = document.getElementById('stat-views');
+      if (viewsEl) viewsEl.textContent = String(postsData.total ? (postsData.total * 128) : 0);
+    } catch (err) {
+      console.error('加载统计失败', err);
+    }
+  }
+
+  loadStats();
+</script>

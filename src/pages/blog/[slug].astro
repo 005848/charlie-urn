@@ -1,40 +1,53 @@
 ---
 import BlogPost from '../../layouts/BlogPost.astro';
-import { getCollection } from 'astro:content';
+import { getSupabaseClient } from '@storage/database/supabase-client';
+import { marked } from 'marked';
 
+// 构建时从数据库读取所有已发布文章，生成静态页面
+// 运行时用户访问也能命中静态页面
 export async function getStaticPaths() {
-  const posts = await getCollection('blog', ({ data }) => !data.draft);
-  return posts.map((post) => {
-    const slug = post.id.replace(/\.(md|mdx)$/, '');
-    return {
-      params: { slug },
+  try {
+    const supabase = getSupabaseClient();
+    const { data: posts, error } = await supabase
+      .from('blog_posts')
+      .select('*')
+      .eq('status', 'published');
+
+    if (error || !posts) {
+      console.error('获取文章列表失败:', error?.message);
+      return [];
+    }
+
+    return posts.map((post: any) => ({
+      params: { slug: post.slug },
       props: { post },
-    };
-  });
+    }));
+  } catch (err) {
+    console.error('getStaticPaths 失败:', err);
+    return [];
+  }
 }
 
 const { post } = Astro.props;
 
-// 使用 post.rendered 获取预渲染的 HTML
-// glob loader 会预渲染内容到 rendered.html
-const rendered = (post as any).rendered;
-let htmlContent = '';
-if (rendered && rendered.html) {
-  htmlContent = rendered.html;
-} else {
-  // 回退到 body (原始 markdown)
-  htmlContent = `<p>${(post as any).body || ''}</p>`;
-}
+// 渲染 Markdown
+const htmlContent = marked.parse(post?.content || '', {
+  breaks: true,
+  gfm: true,
+});
+
+const pubDate = post?.pub_date ? new Date(post.pub_date) : new Date();
+const updatedDate = post?.updated_at ? new Date(post.updated_at) : undefined;
 ---
 
 <BlogPost
-  title={post.data.title}
-  description={post.data.description}
-  pubDate={post.data.pubDate}
-  updatedDate={post.data.updatedDate}
-  heroImage={post.data.heroImage}
-  category={post.data.category}
-  tags={post.data.tags}
+  title={post?.title || ''}
+  description={post?.description || ''}
+  pubDate={pubDate}
+  updatedDate={updatedDate}
+  heroImage={undefined}
+  category={post?.category || 'essay'}
+  tags={post?.tags || []}
 >
   <Fragment set:html={htmlContent} />
 </BlogPost>

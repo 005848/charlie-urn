@@ -1,0 +1,248 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import { CATEGORIES } from '../../../consts';
+---
+
+<Layout title="编辑文章 - Charlie的电子骨灰盒" description="文章编辑后台">
+  <div class="min-h-screen bg-[#faf9f7] py-12">
+    <div class="max-w-3xl mx-auto px-4">
+      <div class="mb-8">
+        <a href="/admin/posts" class="text-[#6b6864] hover:text-[#b8977a] transition-colors text-sm flex items-center gap-1">
+          <span>←</span> 返回文章列表
+        </a>
+        <h1 id="page-title" class="mt-4 text-2xl font-serif text-[#2c2a28]">编辑文章</h1>
+      </div>
+
+      <form id="post-form" class="space-y-6">
+        <div>
+          <label for="title" class="block text-sm text-[#6b6864] mb-2">标题</label>
+          <input
+            type="text"
+            id="title"
+            required
+            class="w-full px-4 py-3 bg-white border border-[#e5e2dd] rounded-lg focus:outline-none focus:border-[#b8977a] transition-colors text-[#2c2a28]"
+            placeholder="输入文章标题"
+          />
+        </div>
+
+        <div>
+          <label for="slug" class="block text-sm text-[#6b6864] mb-2">Slug (URL 标识)</label>
+          <input
+            type="text"
+            id="slug"
+            required
+            class="w-full px-4 py-3 bg-white border border-[#e5e2dd] rounded-lg focus:outline-none focus:border-[#b8977a] transition-colors text-[#2c2a28] font-mono text-sm"
+            placeholder="my-post-slug"
+          />
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="category" class="block text-sm text-[#6b6864] mb-2">分类</label>
+            <select
+              id="category"
+              class="w-full px-4 py-3 bg-white border border-[#e5e2dd] rounded-lg focus:outline-none focus:border-[#b8977a] transition-colors text-[#2c2a28]"
+            >
+              {CATEGORIES.map((cat) => (
+                <option value={cat.value}>{cat.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label for="pubDate" class="block text-sm text-[#6b6864] mb-2">发布日期</label>
+            <input
+              type="date"
+              id="pubDate"
+              class="w-full px-4 py-3 bg-white border border-[#e5e2dd] rounded-lg focus:outline-none focus:border-[#b8977a] transition-colors text-[#2c2a28]"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label for="tags" class="block text-sm text-[#6b6864] mb-2">标签（用逗号分隔）</label>
+          <input
+            type="text"
+            id="tags"
+            class="w-full px-4 py-3 bg-white border border-[#e5e2dd] rounded-lg focus:outline-none focus:border-[#b8977a] transition-colors text-[#2c2a28]"
+            placeholder="标签1, 标签2, 标签3"
+          />
+        </div>
+
+        <div>
+          <label for="description" class="block text-sm text-[#6b6864] mb-2">摘要</label>
+          <textarea
+            id="description"
+            rows="2"
+            class="w-full px-4 py-3 bg-white border border-[#e5e2dd] rounded-lg focus:outline-none focus:border-[#b8977a] transition-colors text-[#2c2a28] resize-none"
+            placeholder="文章简短描述"
+          ></textarea>
+        </div>
+
+        <div>
+          <label for="content" class="block text-sm text-[#6b6864] mb-2">正文 (Markdown)</label>
+          <textarea
+            id="content"
+            rows="20"
+            required
+            class="w-full px-4 py-3 bg-white border border-[#e5e2dd] rounded-lg focus:outline-none focus:border-[#b8977a] transition-colors text-[#2c2a28] font-mono text-sm resize-y"
+            placeholder="# 标题
+
+正文内容..."
+          ></textarea>
+        </div>
+
+        <div>
+          <label for="status" class="block text-sm text-[#6b6864] mb-2">状态</label>
+          <select
+            id="status"
+            class="w-full px-4 py-3 bg-white border border-[#e5e2dd] rounded-lg focus:outline-none focus:border-[#b8977a] transition-colors text-[#2c2a28]"
+          >
+            <option value="published">已发布</option>
+            <option value="draft">草稿</option>
+          </select>
+        </div>
+
+        <div class="flex items-center justify-between pt-4 border-t border-[#e5e2dd]">
+          <button
+            type="button"
+            id="delete-btn"
+            class="hidden px-6 py-2 text-sm text-red-500 hover:text-red-700 transition-colors"
+          >
+            删除文章
+          </button>
+          <div class="flex gap-3 ml-auto">
+            <button
+              type="button"
+              onclick="history.back()"
+              class="px-6 py-2 text-sm text-[#6b6864] hover:text-[#2c2a28] transition-colors"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              id="submit-btn"
+              class="px-6 py-2 bg-[#b8977a] text-white rounded-lg hover:bg-[#8c7159] transition-colors text-sm"
+            >
+              保存
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // 检查登录状态
+    const token = localStorage.getItem('admin_token');
+    if (!token) {
+      window.location.href = '/admin/login';
+    }
+
+    // 获取 URL 中的 id 参数
+    const params = new URLSearchParams(window.location.search);
+    const postId = params.get('id');
+    const pageTitle = document.getElementById('page-title') as HTMLElement;
+    const deleteBtn = document.getElementById('delete-btn') as HTMLButtonElement;
+
+    const form = document.getElementById('post-form') as HTMLFormElement;
+    const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+
+    if (!postId) {
+      pageTitle.textContent = '新建文章';
+      // 设置默认日期
+      const dateInput = document.getElementById('pubDate') as HTMLInputElement;
+      dateInput.value = new Date().toISOString().split('T')[0];
+    } else {
+      pageTitle.textContent = '编辑文章';
+      deleteBtn.classList.remove('hidden');
+      // 加载文章数据
+      loadPost(postId);
+    }
+
+    async function loadPost(id: string) {
+      try {
+        const res = await fetch(`/api/admin/posts/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('加载失败');
+        const post = await res.json();
+
+        (document.getElementById('title') as HTMLInputElement).value = post.title || '';
+        (document.getElementById('slug') as HTMLInputElement).value = post.slug || '';
+        (document.getElementById('category') as HTMLSelectElement).value = post.category || 'essay';
+        (document.getElementById('description') as HTMLTextAreaElement).value = post.description || '';
+        (document.getElementById('content') as HTMLTextAreaElement).value = post.content || '';
+        (document.getElementById('status') as HTMLSelectElement).value = post.status || 'draft';
+        (document.getElementById('tags') as HTMLInputElement).value = (post.tags || []).join(', ');
+        if (post.pub_date) {
+          (document.getElementById('pubDate') as HTMLInputElement).value = post.pub_date.split('T')[0];
+        }
+      } catch (err) {
+        alert('加载文章失败');
+        console.error(err);
+      }
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      submitBtn.disabled = true;
+      submitBtn.textContent = '保存中...';
+
+      const title = (document.getElementById('title') as HTMLInputElement).value;
+      const slug = (document.getElementById('slug') as HTMLInputElement).value;
+      const category = (document.getElementById('category') as HTMLSelectElement).value;
+      const description = (document.getElementById('description') as HTMLTextAreaElement).value;
+      const content = (document.getElementById('content') as HTMLTextAreaElement).value;
+      const status = (document.getElementById('status') as HTMLSelectElement).value as 'published' | 'draft';
+      const tagsStr = (document.getElementById('tags') as HTMLInputElement).value;
+      const tags = tagsStr.split(',').map((t) => t.trim()).filter(Boolean);
+      const pub_date = (document.getElementById('pubDate') as HTMLInputElement).value;
+
+      try {
+        const url = postId ? `/api/admin/posts/${postId}` : '/api/admin/posts';
+        const method = postId ? 'PUT' : 'POST';
+
+        const res = await fetch(url, {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ title, slug, category, description, content, status, tags, pub_date }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || '保存失败');
+        }
+
+        alert('保存成功');
+        window.location.href = '/admin/posts';
+      } catch (err) {
+        alert((err as Error).message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = '保存';
+      }
+    });
+
+    // 删除按钮
+    deleteBtn.addEventListener('click', async () => {
+      if (!postId) return;
+      if (!confirm('确定要删除这篇文章吗？此操作不可撤销。')) return;
+
+      try {
+        const res = await fetch(`/api/admin/posts/${postId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) throw new Error('删除失败');
+
+        alert('删除成功');
+        window.location.href = '/admin/posts';
+      } catch (err) {
+        alert((err as Error).message);
+      }
+    });
+  </script>
+</Layout>

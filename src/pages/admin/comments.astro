@@ -1,0 +1,104 @@
+---
+import Layout from '@layouts/Layout.astro';
+---
+
+<Layout title="留言管理 - 管理后台">
+  <main class="min-h-screen bg-[#faf9f7]">
+    <header class="bg-white border-b border-[#e5e2dd] sticky top-0 z-50">
+      <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-8">
+          <h1 class="text-lg font-serif text-[#2c2a28]">管理后台</h1>
+          <nav class="flex gap-6 text-sm">
+            <a href="/admin" class="text-[#6b6864] hover:text-[#b8977a] transition-colors">概览</a>
+            <a href="/admin/posts" class="text-[#6b6864] hover:text-[#b8977a] transition-colors">文章</a>
+            <a href="/admin/comments" class="text-[#2c2a28] font-medium">留言</a>
+          </nav>
+        </div>
+        <div class="flex items-center gap-4">
+          <a href="/" target="_blank" class="text-sm text-[#6b6864] hover:text-[#b8977a] transition-colors">查看站点</a>
+          <button id="logout-btn" class="text-sm text-[#6b6864] hover:text-red-500 transition-colors">退出</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-5xl mx-auto px-6 py-10">
+      <h2 class="text-xl font-serif text-[#2c2a28] mb-8">留言管理</h2>
+
+      <div id="comments-list" class="space-y-4">
+        <p class="text-center py-12 text-[#9a9690] text-sm">加载中...</p>
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  import { requireAuth, adminFetch, clearAdminToken } from '@lib/client/admin';
+
+  requireAuth();
+
+  async function loadComments() {
+    const res = await adminFetch('/api/admin/comments');
+    const data = await res.json();
+    renderComments(data.data || []);
+  }
+
+  function renderComments(comments: any[]) {
+    const list = document.getElementById('comments-list')!;
+    if (comments.length === 0) {
+      list.innerHTML = `<p class="text-center py-12 text-[#9a9690] text-sm">暂无留言</p>`;
+      return;
+    }
+
+    list.innerHTML = comments.map(c => `
+      <div class="bg-white border border-[#e5e2dd] rounded-lg p-5">
+        <div class="flex items-start justify-between mb-3">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-full bg-[#f0eeeb] flex items-center justify-center text-sm text-[#6b6864] font-medium">
+              ${c.author_name?.charAt(0) || '?'}
+            </div>
+            <div>
+              <div class="font-medium text-[#2c2a28] text-sm">${escapeHtml(c.author_name)}</div>
+              <div class="text-xs text-[#9a9690]">${formatDate(c.created_at)}</div>
+            </div>
+          </div>
+          <button class="delete-btn text-xs text-red-500 hover:underline" data-id="${c.id}">删除</button>
+        </div>
+        <p class="text-sm text-[#2c2a28] leading-relaxed whitespace-pre-wrap">${escapeHtml(c.content)}</p>
+      </div>
+    `).join('');
+
+    list.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = (e.target as HTMLButtonElement).dataset.id;
+        if (!id) return;
+        if (!confirm('确定删除这条留言吗？')) return;
+        // 复用 adminFetch 模式调删除接口（需要先创建，这里用通用方式）
+        const res = await adminFetch(`/api/admin/comments/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+          loadComments();
+        } else {
+          alert('删除失败');
+        }
+      });
+    });
+  }
+
+  function escapeHtml(str: string): string {
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+
+  function formatDate(dateStr: string): string {
+    const d = new Date(dateStr);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+
+  document.getElementById('logout-btn')?.addEventListener('click', () => {
+    clearAdminToken();
+    window.location.href = '/admin/login';
+  });
+
+  loadComments();
+</script>

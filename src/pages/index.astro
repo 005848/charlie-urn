@@ -2,19 +2,10 @@
 import Layout from '../layouts/Layout.astro';
 import PostCard from '../components/PostCard.astro';
 import Guestbook from '../components/Guestbook.astro';
-import FormattedDate from '../components/FormattedDate.astro';
 import { CATEGORIES } from '../consts';
-import { getCollection } from 'astro:content';
 
-const posts = (await getCollection('blog', ({ data }) => !data.draft))
-  .sort((a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime());
-
-const latestPosts = posts.slice(0, 4);
-
-const totalWords = posts.reduce((acc, post) => {
-  // 粗略估算字数
-  return acc + (post.body?.length || 0);
-}, 0);
+// 静态构建时用占位，实际数据由客户端 JS 从 API 动态加载
+const latestPosts: any[] = [];
 ---
 
 <Layout>
@@ -52,7 +43,7 @@ const totalWords = posts.reduce((acc, post) => {
 
       <div class="hero-meta animate-fade-in-up delay-400">
         <div class="meta-item">
-          <span class="meta-num">{posts.length}</span>
+          <span class="meta-num" id="stat-post-count">—</span>
           <span class="meta-label">篇文章</span>
         </div>
         <span class="meta-divider">·</span>
@@ -62,7 +53,7 @@ const totalWords = posts.reduce((acc, post) => {
         </div>
         <span class="meta-divider">·</span>
         <div class="meta-item">
-          <span class="meta-num">{Math.round(totalWords / 1000)}k</span>
+          <span class="meta-num" id="stat-word-count">—</span>
           <span class="meta-label">字记忆</span>
         </div>
       </div>
@@ -83,10 +74,8 @@ const totalWords = posts.reduce((acc, post) => {
         <span class="heading-sub">Latest Memories</span>
       </div>
 
-      <div class="posts-grid">
-        {latestPosts.map((post) => (
-          <PostCard post={post} />
-        ))}
+      <div id="latest-posts-container" class="posts-grid">
+        <p class="text-center text-[#9a9690] text-sm col-span-full py-12">加载中...</p>
       </div>
 
       <div class="section-cta">
@@ -107,17 +96,14 @@ const totalWords = posts.reduce((acc, post) => {
         <span class="heading-sub">Categories</span>
       </div>
 
-      <div class="categories-grid">
-        {CATEGORIES.filter(c => c.id !== 'all').map((cat, index) => {
-          const count = posts.filter(p => p.data.category === cat.id).length;
-          return (
-            <a href={`/blog?category=${cat.id}`} class="category-card" style={`animation-delay: ${index * 100}ms`}>
-              <span class="cat-icon">{cat.icon}</span>
-              <span class="cat-name">{cat.label}</span>
-              <span class="cat-count">{count} 篇</span>
-            </a>
-          );
-        })}
+      <div class="categories-grid" id="categories-grid">
+        {CATEGORIES.filter(c => c.id !== 'all').map((cat, index) => (
+          <a href={`/blog?category=${cat.id}`} class="category-card" style={`animation-delay: ${index * 100}ms`}>
+            <span class="cat-icon">{cat.icon}</span>
+            <span class="cat-name">{cat.label}</span>
+            <span class="cat-count" data-cat-id={cat.id}>— 篇</span>
+          </a>
+        ))}
       </div>
     </div>
   </section>
@@ -141,6 +127,90 @@ const totalWords = posts.reduce((acc, post) => {
   <!-- Guestbook -->
   <Guestbook />
 </Layout>
+
+<script>
+  // 从 API 动态加载文章数据
+  const categoryLabels: Record<string, string> = {
+    memory: '回忆',
+    letter: '书信',
+    essay: '随笔',
+    photo: '影像',
+    poem: '诗句',
+  };
+
+  async function loadHomeData() {
+    try {
+      // 加载最近文章和总数
+      const res = await fetch('/api/posts?pageSize=4&includeContent=false');
+      const data = await res.json();
+
+      if (data.success) {
+        // 更新统计数
+        const countEl = document.getElementById('stat-post-count');
+        if (countEl) countEl.textContent = String(data.total || 0);
+
+        const wordEl = document.getElementById('stat-word-count');
+        if (wordEl) wordEl.textContent = '∞';
+
+        // 渲染文章卡片
+        const container = document.getElementById('latest-posts-container');
+        if (container) {
+          const posts = data.data || [];
+          if (posts.length === 0) {
+            container.innerHTML = `<p class="text-center text-[#9a9690] text-sm col-span-full py-12">暂无文章</p>`;
+          } else {
+            container.innerHTML = posts.map((post: any) => `
+              <a href="/blog/${post.slug}" class="post-card animate-fade-in-up">
+                <div class="post-card-meta">
+                  <span class="post-card-category">${categoryLabels[post.category] || post.category}</span>
+                  <span class="post-card-date">${formatDate(post.pub_date)}</span>
+                </div>
+                <h3 class="post-card-title">${escapeHtml(post.title)}</h3>
+                <p class="post-card-excerpt">${escapeHtml(post.description || '')}</p>
+                <div class="post-card-footer">
+                  <span class="read-more">阅读全文 →</span>
+                </div>
+              </a>
+            `).join('');
+          }
+        }
+
+        // 更新分类计数（用全部文章数据估算，这里取前100条来统计）
+        const allRes = await fetch('/api/posts?pageSize=100&includeContent=false');
+        const allData = await allRes.json();
+        if (allData.success && allData.data) {
+          const counts: Record<string, number> = {};
+          for (const p of allData.data) {
+            counts[p.category] = (counts[p.category] || 0) + 1;
+          }
+          document.querySelectorAll<HTMLSpanElement>('.cat-count[data-cat-id]').forEach(el => {
+            const catId = el.dataset.catId!;
+            el.textContent = `${counts[catId] || 0} 篇`;
+          });
+        }
+      }
+    } catch (err) {
+      console.error('加载文章失败', err);
+      const container = document.getElementById('latest-posts-container');
+      if (container) {
+        container.innerHTML = `<p class="text-center text-[#9a9690] text-sm col-span-full py-12">加载失败，请刷新重试</p>`;
+      }
+    }
+  }
+
+  function formatDate(dateStr: string): string {
+    const d = new Date(dateStr);
+    return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  function escapeHtml(str: string): string {
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+
+  loadHomeData();
+</script>
 
 <style>
 /* Hero Section */
