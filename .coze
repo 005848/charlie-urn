@@ -7,4 +7,4 @@ run = ["sh", "-c", "pnpm exec astro dev --port ${DEPLOY_RUN_PORT} --host"]
 
 [deploy]
 build = ["pnpm", "run", "build"]
-run = ["sh", "-c", "PORT=${DEPLOY_RUN_PORT} HOST=0.0.0.0 node ./dist/server/entry.mjs"]
+run = ["sh", "-c", "npx serve ./dist -l ${DEPLOY_RUN_PORT} -s"]

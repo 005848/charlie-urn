@@ -132,11 +132,27 @@ import { CATEGORIES } from '../../../consts';
   </div>
 
   <script>
-    // 检查登录状态
-    const token = localStorage.getItem('admin_token');
-    if (!token) {
-      window.location.href = '/admin/login';
+    import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+    let supabase: SupabaseClient | null = null;
+    function getSupabase() {
+      if (supabase) return supabase;
+      const url = document.querySelector<HTMLMetaElement>('meta[name="x-supabase-url"]')?.content || '';
+      const anonKey = document.querySelector<HTMLMetaElement>('meta[name="x-supabase-anon-key"]')?.content || '';
+      if (!url || !anonKey) return null;
+      supabase = createClient(url, anonKey);
+      return supabase;
     }
+
+    // 检查登录状态
+    (async () => {
+      const sb = getSupabase();
+      if (!sb) return;
+      const { data } = await sb.auth.getSession();
+      if (!data?.session) {
+        window.location.href = '/admin/login';
+      }
+    })();
 
     // 获取 URL 中的 id 参数
     const params = new URLSearchParams(window.location.search);
@@ -149,23 +165,27 @@ import { CATEGORIES } from '../../../consts';
 
     if (!postId) {
       pageTitle.textContent = '新建文章';
-      // 设置默认日期
       const dateInput = document.getElementById('pubDate') as HTMLInputElement;
       dateInput.value = new Date().toISOString().split('T')[0];
     } else {
       pageTitle.textContent = '编辑文章';
       deleteBtn.classList.remove('hidden');
-      // 加载文章数据
       loadPost(postId);
     }
 
     async function loadPost(id: string) {
+      const sb = getSupabase();
+      if (!sb) return;
+
       try {
-        const res = await fetch(`/api/admin/posts/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error('加载失败');
-        const post = await res.json();
+        const { data: post, error } = await sb
+          .from('blog_posts')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (error) throw error;
+        if (!post) throw new Error('文章不存在');
 
         (document.getElementById('title') as HTMLInputElement).value = post.title || '';
         (document.getElementById('slug') as HTMLInputElement).value = post.slug || '';
@@ -178,13 +198,16 @@ import { CATEGORIES } from '../../../consts';
           (document.getElementById('pubDate') as HTMLInputElement).value = post.pub_date.split('T')[0];
         }
       } catch (err) {
-        alert('加载文章失败');
+        alert('加载文章失败：' + (err as any).message);
         console.error(err);
       }
     }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      const sb = getSupabase();
+      if (!sb) return;
+
       submitBtn.disabled = true;
       submitBtn.textContent = '保存中...';
 
@@ -193,33 +216,31 @@ import { CATEGORIES } from '../../../consts';
       const category = (document.getElementById('category') as HTMLSelectElement).value;
       const description = (document.getElementById('description') as HTMLTextAreaElement).value;
       const content = (document.getElementById('content') as HTMLTextAreaElement).value;
-      const status = (document.getElementById('status') as HTMLSelectElement).value as 'published' | 'draft';
+      const status = (document.getElementById('status') as HTMLSelectElement).value;
       const tagsStr = (document.getElementById('tags') as HTMLInputElement).value;
       const tags = tagsStr.split(',').map((t) => t.trim()).filter(Boolean);
       const pub_date = (document.getElementById('pubDate') as HTMLInputElement).value;
 
       try {
-        const url = postId ? `/api/admin/posts/${postId}` : '/api/admin/posts';
-        const method = postId ? 'PUT' : 'POST';
-
-        const res = await fetch(url, {
-          method,
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ title, slug, category, description, content, status, tags, pub_date }),
-        });
-
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || '保存失败');
+        if (postId) {
+          // 更新
+          const { error } = await sb
+            .from('blog_posts')
+            .update({ title, slug, category, description, content, status, tags, pub_date, updated_at: new Date().toISOString() })
+            .eq('id', postId);
+          if (error) throw error;
+        } else {
+          // 新建
+          const { error } = await sb
+            .from('blog_posts')
+            .insert({ title, slug, category, description, content, status, tags, pub_date });
+          if (error) throw error;
         }
 
         alert('保存成功');
         window.location.href = '/admin/posts';
       } catch (err) {
-        alert((err as Error).message);
+        alert('保存失败：' + (err as any).message);
         submitBtn.disabled = false;
         submitBtn.textContent = '保存';
       }
@@ -230,18 +251,20 @@ import { CATEGORIES } from '../../../consts';
       if (!postId) return;
       if (!confirm('确定要删除这篇文章吗？此操作不可撤销。')) return;
 
-      try {
-        const res = await fetch(`/api/admin/posts/${postId}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        });
+      const sb = getSupabase();
+      if (!sb) return;
 
-        if (!res.ok) throw new Error('删除失败');
+      try {
+        const { error } = await sb
+          .from('blog_posts')
+          .delete()
+          .eq('id', postId);
+        if (error) throw error;
 
         alert('删除成功');
         window.location.href = '/admin/posts';
       } catch (err) {
-        alert((err as Error).message);
+        alert('删除失败：' + (err as any).message);
       }
     });
   </script>

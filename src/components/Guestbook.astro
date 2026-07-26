@@ -69,6 +69,18 @@
 </section>
 
 <script>
+  import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+  let supabase: SupabaseClient | null = null;
+  function getSupabase() {
+    if (supabase) return supabase;
+    const url = document.querySelector<HTMLMetaElement>('meta[name="x-supabase-url"]')?.content || '';
+    const anonKey = document.querySelector<HTMLMetaElement>('meta[name="x-supabase-anon-key"]')?.content || '';
+    if (!url || !anonKey) return null;
+    supabase = createClient(url, anonKey);
+    return supabase;
+  }
+
   // 简单的头像颜色生成
   function getAvatarColor(name: string): string {
     const colors = ['#b8977a', '#9a9690', '#8c7159', '#d4c4b0', '#a8a095'];
@@ -104,11 +116,23 @@
     const listEl = document.getElementById('guestbook-list');
     if (!listEl) return;
 
-    try {
-      const res = await fetch('/api/comments?pageSize=50');
-      const data = await res.json();
+    const sb = getSupabase();
+    if (!sb) {
+      listEl.innerHTML = `<p class="text-center text-[#9a9690] text-sm py-8">数据库未配置</p>`;
+      return;
+    }
 
-      if (!data.success || !data.data?.length) {
+    try {
+      const { data: comments, error } = await sb
+        .from('guestbook_comments')
+        .select('*')
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      if (!comments || comments.length === 0) {
         listEl.innerHTML = `
           <div class="text-center py-8">
             <p class="text-[#9a9690] text-sm">还没有人留言</p>
@@ -118,7 +142,7 @@
         return;
       }
 
-      listEl.innerHTML = data.data.map((c: any) => `
+      listEl.innerHTML = comments.map((c: any) => `
         <div class="comment-item bg-white border border-[#e5e2dd] rounded-lg p-5 animate-fade-in">
           <div class="flex items-start gap-3">
             <div class="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0" style="background: ${getAvatarColor(c.author_name)}">
@@ -135,6 +159,7 @@
         </div>
       `).join('');
     } catch (err) {
+      console.error('加载留言失败', err);
       listEl.innerHTML = `<p class="text-center text-[#9a9690] text-sm py-8">加载失败，请刷新重试</p>`;
     }
   }
@@ -158,32 +183,39 @@
 
     if (!name || !content) return;
 
+    const sb = getSupabase();
+    if (!sb) {
+      msgEl.textContent = '数据库未配置，无法留言';
+      msgEl.className = 'text-xs text-red-500';
+      msgEl.classList.remove('hidden');
+      return;
+    }
+
     submitBtn.disabled = true;
     submitBtn.textContent = '发送中...';
     msgEl.classList.add('hidden');
 
     try {
-      const res = await fetch('/api/comments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ author_name: name, author_email: email, content }),
-      });
-      const data = await res.json();
+      const { error } = await sb
+        .from('guestbook_comments')
+        .insert({
+          author_name: name,
+          author_email: email || null,
+          content,
+          status: 'pending',
+        });
 
-      if (data.success) {
-        msgEl.textContent = '留言成功，愿风带走你的话';
-        msgEl.className = 'text-xs text-[#b8977a]';
-        msgEl.classList.remove('hidden');
-        form.reset();
-        if (countEl) countEl.textContent = '0 / 500';
-        loadComments();
-      } else {
-        msgEl.textContent = data.error || '留言失败，请重试';
-        msgEl.className = 'text-xs text-red-500';
-        msgEl.classList.remove('hidden');
-      }
-    } catch (err) {
-      msgEl.textContent = '网络错误，请重试';
+      if (error) throw error;
+
+      msgEl.textContent = '留言已提交，审核通过后会显示';
+      msgEl.className = 'text-xs text-[#b8977a]';
+      msgEl.classList.remove('hidden');
+      form.reset();
+      if (countEl) countEl.textContent = '0 / 500';
+      loadComments();
+    } catch (err: any) {
+      console.error('留言失败', err);
+      msgEl.textContent = err?.message || '留言失败，请重试';
       msgEl.className = 'text-xs text-red-500';
       msgEl.classList.remove('hidden');
     } finally {

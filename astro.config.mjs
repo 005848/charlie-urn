@@ -2,7 +2,6 @@
 
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
-import node from '@astrojs/node';
 import { defineConfig, fontProviders } from 'astro/config';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -15,10 +14,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   site: 'https://example.com',
   integrations: [mdx(), sitemap()],
-  output: 'server',
-  adapter: node({
-    mode: 'standalone',
-  }),
+  output: 'static',
 
   fonts: [
       {

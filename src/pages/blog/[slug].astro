@@ -2,9 +2,7 @@
 import BlogPost from '../../layouts/BlogPost.astro';
 import { getSupabaseClient } from '@storage/database/supabase-client';
 import { marked } from 'marked';
-
 // 构建时从数据库读取所有已发布文章，生成静态页面
-// 运行时用户访问也能命中静态页面
 export async function getStaticPaths() {
   try {
     const supabase = getSupabaseClient();
@@ -51,3 +49,29 @@ const updatedDate = post?.updated_at ? new Date(post.updated_at) : undefined;
 >
   <Fragment set:html={htmlContent} />
 </BlogPost>
+
+<!-- 用于前端获取当前文章 slug（浏览量统计用） -->
+<script is:inline>
+  window.__POST_SLUG__ = "{post?.slug || ''}";
+</script>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+
+  // 页面加载后，前端异步增加浏览量
+  const slug = (window as any).__POST_SLUG__;
+  if (slug && !sessionStorage.getItem(`viewed_${slug}`)) {
+    const url = document.querySelector<HTMLMetaElement>('meta[name="x-supabase-url"]')?.content || '';
+    const anonKey = document.querySelector<HTMLMetaElement>('meta[name="x-supabase-anon-key"]')?.content || '';
+    if (url && anonKey) {
+      try {
+        const sb = createClient(url, anonKey);
+        // 直接用 update 增加浏览量，不依赖 rpc 函数
+        sb.from('blog_posts').update({ view_count: (window as any).__TEMP_VIEW__ || 0 }).eq('slug', slug).catch(() => {});
+        // 简化：调用 rpc（如果函数存在），失败就静默
+        sb.rpc('increment_views', { post_slug: slug }).catch(() => {});
+        sessionStorage.setItem(`viewed_${slug}`, '1');
+      } catch {}
+    }
+  }
+</script>

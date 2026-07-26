@@ -1,5 +1,6 @@
 ---
 import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
+import { loadEnv } from '../storage/database/supabase-client';
 
 interface Props {
 	title?: string;
@@ -9,6 +10,22 @@ interface Props {
 const { title = SITE_TITLE, description = SITE_DESCRIPTION } = Astro.props;
 
 const fullTitle = title === SITE_TITLE ? title : `${title} — ${SITE_TITLE}`;
+
+// 从服务端环境变量读取 Supabase 配置，注入到 meta 标签中
+// 前端通过读取 meta 标签获取配置（避免硬编码在构建产物中）
+await loadEnv();
+const supabaseUrl =
+	import.meta.env.Coze_SUPABASE_URL ||
+	import.meta.env.PUBLIC_SUPABASE_URL ||
+	process?.env?.COZE_SUPABASE_URL ||
+	process?.env?.SUPABASE_URL ||
+	'';
+const supabaseAnonKey =
+	import.meta.env.Coze_SUPABASE_ANON_KEY ||
+	import.meta.env.PUBLIC_SUPABASE_ANON_KEY ||
+	process?.env?.COZE_SUPABASE_ANON_KEY ||
+	process?.env?.SUPABASE_ANON_KEY ||
+	'';
 ---
 
 <meta charset="UTF-8" />
@@ -21,6 +38,10 @@ const fullTitle = title === SITE_TITLE ? title : `${title} — ${SITE_TITLE}`;
 <meta property="og:type" content="website" />
 <meta name="twitter:card" content="summary_large_image" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+<!-- Supabase 配置（前端通过 meta 标签读取） -->
+<meta name="x-supabase-url" content={supabaseUrl} />
+<meta name="x-supabase-anon-key" content={supabaseAnonKey} />
 
 <!-- Google Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.cn" />

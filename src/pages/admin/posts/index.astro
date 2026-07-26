@@ -78,9 +78,27 @@ import Layout from '@layouts/Layout.astro';
 </Layout>
 
 <script>
-  import { requireAuth, adminFetch, clearAdminToken } from '@lib/client/admin';
+  import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-  requireAuth();
+  let supabase: SupabaseClient | null = null;
+  function getSupabase() {
+    if (supabase) return supabase;
+    const url = document.querySelector<HTMLMetaElement>('meta[name="x-supabase-url"]')?.content || '';
+    const anonKey = document.querySelector<HTMLMetaElement>('meta[name="x-supabase-anon-key"]')?.content || '';
+    if (!url || !anonKey) return null;
+    supabase = createClient(url, anonKey);
+    return supabase;
+  }
+
+  // 鉴权
+  (async () => {
+    const sb = getSupabase();
+    if (!sb) return;
+    const { data } = await sb.auth.getSession();
+    if (!data?.session) {
+      window.location.href = '/admin/login';
+    }
+  })();
 
   const categoryLabels: Record<string, string> = {
     memory: '回忆',
@@ -99,16 +117,37 @@ import Layout from '@layouts/Layout.astro';
   const pageSize = 15;
 
   async function loadPosts() {
+    const sb = getSupabase();
+    if (!sb) return;
+
     const search = (document.getElementById('search-input') as HTMLInputElement).value;
     const category = (document.getElementById('category-filter') as HTMLSelectElement).value;
 
-    let url = `/api/posts?page=${currentPage}&pageSize=${pageSize}&includeContent=false`;
-    if (category && category !== 'all') url += `&category=${category}`;
-    if (search) url += `&search=${encodeURIComponent(search)}`;
+    let query = sb
+      .from('blog_posts')
+      .select('*', { count: 'exact' });
 
-    const res = await adminFetch(url);
-    const data = await res.json();
-    renderPosts(data.data || [], data.total || 0);
+    if (category && category !== 'all') {
+      query = query.eq('category', category);
+    }
+
+    if (search) {
+      query = query.or(`title.ilike.%${search}%,slug.ilike.%${search}%`);
+    }
+
+    const from = (currentPage - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    const { data: posts, count, error } = await query
+      .order('pub_date', { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      console.error('加载文章失败', error);
+      return;
+    }
+
+    renderPosts(posts || [], count || 0);
   }
 
   function renderPosts(posts: any[], total: number) {
@@ -191,12 +230,18 @@ import Layout from '@layouts/Layout.astro';
   }
 
   async function deletePost(id: string) {
-    const res = await adminFetch(`/api/admin/posts/${id}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (data.success) {
-      loadPosts();
+    const sb = getSupabase();
+    if (!sb) return;
+
+    const { error } = await sb
+      .from('blog_posts')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      alert('删除失败：' + error.message);
     } else {
-      alert('删除失败：' + (data.error || '未知错误'));
+      loadPosts();
     }
   }
 
@@ -226,10 +271,12 @@ import Layout from '@layouts/Layout.astro';
     loadPosts();
   });
 
-  document.getElementById('logout-btn')?.addEventListener('click', () => {
-    clearAdminToken();
+  document.getElementById('logout-btn')?.addEventListener('click', async () => {
+    const sb = getSupabase();
+    if (sb) await sb.auth.signOut();
     window.location.href = '/admin/login';
   });
 
-  loadPosts();
+  // 延迟加载（等 session 检查）
+  setTimeout(loadPosts, 400);
 </script>

@@ -32,14 +32,43 @@ import Layout from '@layouts/Layout.astro';
 </Layout>
 
 <script>
-  import { requireAuth, adminFetch, clearAdminToken } from '@lib/client/admin';
+  import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-  requireAuth();
+  let supabase: SupabaseClient | null = null;
+  function getSupabase() {
+    if (supabase) return supabase;
+    const url = document.querySelector<HTMLMetaElement>('meta[name="x-supabase-url"]')?.content || '';
+    const anonKey = document.querySelector<HTMLMetaElement>('meta[name="x-supabase-anon-key"]')?.content || '';
+    if (!url || !anonKey) return null;
+    supabase = createClient(url, anonKey);
+    return supabase;
+  }
+
+  // 鉴权
+  (async () => {
+    const sb = getSupabase();
+    if (!sb) return;
+    const { data } = await sb.auth.getSession();
+    if (!data?.session) {
+      window.location.href = '/admin/login';
+    }
+  })();
 
   async function loadComments() {
-    const res = await adminFetch('/api/admin/comments');
-    const data = await res.json();
-    renderComments(data.data || []);
+    const sb = getSupabase();
+    if (!sb) return;
+
+    const { data: comments, error } = await sb
+      .from('guestbook_comments')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('加载留言失败', error);
+      return;
+    }
+
+    renderComments(comments || []);
   }
 
   function renderComments(comments: any[]) {
@@ -72,13 +101,19 @@ import Layout from '@layouts/Layout.astro';
         const id = (e.target as HTMLButtonElement).dataset.id;
         if (!id) return;
         if (!confirm('确定删除这条留言吗？')) return;
-        // 复用 adminFetch 模式调删除接口（需要先创建，这里用通用方式）
-        const res = await adminFetch(`/api/admin/comments/${id}`, { method: 'DELETE' });
-        const data = await res.json();
-        if (data.success) {
-          loadComments();
+
+        const sb = getSupabase();
+        if (!sb) return;
+
+        const { error } = await sb
+          .from('guestbook_comments')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          alert('删除失败：' + error.message);
         } else {
-          alert('删除失败');
+          loadComments();
         }
       });
     });
@@ -95,10 +130,11 @@ import Layout from '@layouts/Layout.astro';
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   }
 
-  document.getElementById('logout-btn')?.addEventListener('click', () => {
-    clearAdminToken();
+  document.getElementById('logout-btn')?.addEventListener('click', async () => {
+    const sb = getSupabase();
+    if (sb) await sb.auth.signOut();
     window.location.href = '/admin/login';
   });
 
-  loadComments();
+  setTimeout(loadComments, 400);
 </script>

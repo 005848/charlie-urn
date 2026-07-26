@@ -129,7 +129,8 @@ const latestPosts: any[] = [];
 </Layout>
 
 <script>
-  // 从 API 动态加载文章数据
+  import { createClient } from '@supabase/supabase-js';
+
   const categoryLabels: Record<string, string> = {
     memory: '回忆',
     letter: '书信',
@@ -138,56 +139,75 @@ const latestPosts: any[] = [];
     poem: '诗句',
   };
 
+  function getSupabaseClient() {
+    const url = document.querySelector<HTMLMetaElement>('meta[name="x-supabase-url"]')?.content || '';
+    const anonKey = document.querySelector<HTMLMetaElement>('meta[name="x-supabase-anon-key"]')?.content || '';
+    if (!url || !anonKey) return null;
+    return createClient(url, anonKey);
+  }
+
   async function loadHomeData() {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      console.warn('[Supabase] 未配置');
+      return;
+    }
+
     try {
-      // 加载最近文章和总数
-      const res = await fetch('/api/posts?pageSize=4&includeContent=false');
-      const data = await res.json();
+      // 加载最近 4 篇文章
+      const { data: posts, error, count } = await supabase
+        .from('blog_posts')
+        .select('id, slug, title, description, category, pub_date, tags', { count: 'exact' })
+        .eq('status', 'published')
+        .order('pub_date', { ascending: false })
+        .range(0, 3);
 
-      if (data.success) {
-        // 更新统计数
-        const countEl = document.getElementById('stat-post-count');
-        if (countEl) countEl.textContent = String(data.total || 0);
+      if (error) throw error;
 
-        const wordEl = document.getElementById('stat-word-count');
-        if (wordEl) wordEl.textContent = '∞';
+      // 更新统计数
+      const countEl = document.getElementById('stat-post-count');
+      if (countEl && count != null) countEl.textContent = String(count);
 
-        // 渲染文章卡片
-        const container = document.getElementById('latest-posts-container');
-        if (container) {
-          const posts = data.data || [];
-          if (posts.length === 0) {
-            container.innerHTML = `<p class="text-center text-[#9a9690] text-sm col-span-full py-12">暂无文章</p>`;
-          } else {
-            container.innerHTML = posts.map((post: any) => `
-              <a href="/blog/${post.slug}" class="post-card animate-fade-in-up">
-                <div class="post-card-meta">
-                  <span class="post-card-category">${categoryLabels[post.category] || post.category}</span>
-                  <span class="post-card-date">${formatDate(post.pub_date)}</span>
-                </div>
-                <h3 class="post-card-title">${escapeHtml(post.title)}</h3>
-                <p class="post-card-excerpt">${escapeHtml(post.description || '')}</p>
-                <div class="post-card-footer">
-                  <span class="read-more">阅读全文 →</span>
-                </div>
-              </a>
-            `).join('');
-          }
+      const wordEl = document.getElementById('stat-word-count');
+      if (wordEl) wordEl.textContent = '∞';
+
+      // 渲染文章卡片
+      const container = document.getElementById('latest-posts-container');
+      if (container) {
+        if (!posts || posts.length === 0) {
+          container.innerHTML = `<p class="text-center text-[#9a9690] text-sm col-span-full py-12">暂无文章</p>`;
+        } else {
+          container.innerHTML = posts.map((post: any) => `
+            <a href="/blog/${post.slug}" class="post-card animate-fade-in-up">
+              <div class="post-card-meta">
+                <span class="post-card-category">${categoryLabels[post.category] || post.category}</span>
+                <span class="post-card-date">${formatDate(post.pub_date)}</span>
+              </div>
+              <h3 class="post-card-title">${escapeHtml(post.title)}</h3>
+              <p class="post-card-excerpt">${escapeHtml(post.description || '')}</p>
+              <div class="post-card-footer">
+                <span class="read-more">阅读全文 →</span>
+              </div>
+            </a>
+          `).join('');
         }
+      }
 
-        // 更新分类计数（用全部文章数据估算，这里取前100条来统计）
-        const allRes = await fetch('/api/posts?pageSize=100&includeContent=false');
-        const allData = await allRes.json();
-        if (allData.success && allData.data) {
-          const counts: Record<string, number> = {};
-          for (const p of allData.data) {
-            counts[p.category] = (counts[p.category] || 0) + 1;
-          }
-          document.querySelectorAll<HTMLSpanElement>('.cat-count[data-cat-id]').forEach(el => {
-            const catId = el.dataset.catId!;
-            el.textContent = `${counts[catId] || 0} 篇`;
-          });
+      // 加载分类统计
+      const { data: allPosts, error: allError } = await supabase
+        .from('blog_posts')
+        .select('category')
+        .eq('status', 'published');
+
+      if (!allError && allPosts) {
+        const counts: Record<string, number> = {};
+        for (const p of allPosts) {
+          counts[p.category] = (counts[p.category] || 0) + 1;
         }
+        document.querySelectorAll<HTMLSpanElement>('.cat-count[data-cat-id]').forEach(el => {
+          const catId = el.dataset.catId!;
+          el.textContent = `${counts[catId] || 0} 篇`;
+        });
       }
     } catch (err) {
       console.error('加载文章失败', err);

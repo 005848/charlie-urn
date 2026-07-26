@@ -61,10 +61,30 @@ import Layout from '@layouts/Layout.astro';
 </Layout>
 
 <script>
-  import { requireAuth, adminFetch, clearAdminToken } from '@lib/client/admin';
+  import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+  let supabase: SupabaseClient | null = null;
+  function getSupabase() {
+    if (supabase) return supabase;
+    const url = document.querySelector<HTMLMetaElement>('meta[name="x-supabase-url"]')?.content || '';
+    const anonKey = document.querySelector<HTMLMetaElement>('meta[name="x-supabase-anon-key"]')?.content || '';
+    if (!url || !anonKey) return null;
+    supabase = createClient(url, anonKey);
+    return supabase;
+  }
 
   // 鉴权
-  requireAuth();
+  (async () => {
+    const sb = getSupabase();
+    if (!sb) {
+      window.location.href = '/admin/login';
+      return;
+    }
+    const { data } = await sb.auth.getSession();
+    if (!data?.session) {
+      window.location.href = '/admin/login';
+    }
+  })();
 
   // 高亮当前导航
   const pageMap: Record<string, string> = {
@@ -82,34 +102,49 @@ import Layout from '@layouts/Layout.astro';
   });
 
   // 退出登录
-  document.getElementById('logout-btn')?.addEventListener('click', () => {
-    clearAdminToken();
+  document.getElementById('logout-btn')?.addEventListener('click', async () => {
+    const sb = getSupabase();
+    if (sb) {
+      await sb.auth.signOut();
+    }
     window.location.href = '/admin/login';
   });
 
   // 加载统计数据
   async function loadStats() {
+    const sb = getSupabase();
+    if (!sb) return;
+
     try {
       // 文章数
-      const postsRes = await adminFetch('/api/posts?pageSize=1');
-      const postsData = await postsRes.json();
+      const { count: postsCount, error: postsError } = await sb
+        .from('blog_posts')
+        .select('*', { count: 'exact', head: true });
+
       const postsEl = document.getElementById('stat-posts');
-      if (postsEl) postsEl.textContent = String(postsData.total ?? 0);
+      if (postsEl) postsEl.textContent = String(postsCount ?? 0);
 
       // 留言数
-      const commentsRes = await adminFetch('/api/comments?pageSize=1');
-      const commentsData = await commentsRes.json();
-      const commentsEl = document.getElementById('stat-comments');
-      if (commentsEl) commentsEl.textContent = String(commentsData.total ?? 0);
+      const { count: commentsCount } = await sb
+        .from('guestbook_comments')
+        .select('*', { count: 'exact', head: true });
 
-      // 访问量（用 blog_posts 的 view_count 总和）
-      // 简化处理：文章总数 * 平均阅读
+      const commentsEl = document.getElementById('stat-comments');
+      if (commentsEl) commentsEl.textContent = String(commentsCount ?? 0);
+
+      // 访问量（blog_posts view_count 总和）
+      const { data: viewsData } = await sb
+        .from('blog_posts')
+        .select('view_count');
+
+      const totalViews = (viewsData || []).reduce((sum: number, p: any) => sum + (p.view_count || 0), 0);
       const viewsEl = document.getElementById('stat-views');
-      if (viewsEl) viewsEl.textContent = String(postsData.total ? (postsData.total * 128) : 0);
+      if (viewsEl) viewsEl.textContent = String(totalViews);
     } catch (err) {
       console.error('加载统计失败', err);
     }
   }
 
-  loadStats();
+  // 等 session 检查完再加载
+  setTimeout(loadStats, 300);
 </script>

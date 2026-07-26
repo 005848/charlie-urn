@@ -77,11 +77,22 @@ import { CATEGORIES } from '../../consts';
 </Layout>
 
 <script>
+  import { createClient, SupabaseClient } from '@supabase/supabase-js';
   import { CATEGORIES } from '../../consts';
 
   const categoryLabels: Record<string, string> = {};
   for (const cat of CATEGORIES) {
     categoryLabels[cat.id] = cat.label;
+  }
+
+  let supabase: SupabaseClient | null = null;
+  function getSupabase() {
+    if (supabase) return supabase;
+    const url = document.querySelector<HTMLMetaElement>('meta[name="x-supabase-url"]')?.content || '';
+    const anonKey = document.querySelector<HTMLMetaElement>('meta[name="x-supabase-anon-key"]')?.content || '';
+    if (!url || !anonKey) return null;
+    supabase = createClient(url, anonKey);
+    return supabase;
   }
 
   let currentCategory = 'all';
@@ -100,6 +111,11 @@ import { CATEGORIES } from '../../consts';
   const postCountEl = document.getElementById('post-count')!;
 
   async function loadPosts(reset = false) {
+    const sb = getSupabase();
+    if (!sb) {
+      postsContainer.innerHTML = '<p class="text-center text-[#9a9690] text-sm py-12">数据库未配置</p>';
+      return;
+    }
     if (loading) return;
     if (reset) {
       currentPage = 1;
@@ -113,37 +129,50 @@ import { CATEGORIES } from '../../consts';
     loadMoreBtn.disabled = true;
 
     try {
-      let url = `/api/posts?page=${currentPage}&pageSize=${pageSize}`;
-      if (currentCategory && currentCategory !== 'all') url += `&category=${currentCategory}`;
-      if (currentSearch) url += `&search=${encodeURIComponent(currentSearch)}`;
+      let query = sb
+        .from('blog_posts')
+        .select('id, slug, title, description, category, pub_date, tags', { count: 'exact' })
+        .eq('status', 'published');
 
-      const res = await fetch(url);
-      const data = await res.json();
+      if (currentCategory && currentCategory !== 'all') {
+        query = query.eq('category', currentCategory);
+      }
 
-      if (data.success) {
-        const posts = data.data || [];
-        totalPosts = data.total || 0;
-        allPosts = reset ? posts : [...allPosts, ...posts];
+      if (currentSearch) {
+        query = query.or(`title.ilike.%${currentSearch}%,description.ilike.%${currentSearch}%`);
+      }
 
-        postCountEl.textContent = String(totalPosts);
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
 
-        if (allPosts.length === 0) {
-          postsContainer.style.display = 'none';
-          document.getElementById('timelineView')!.style.display = 'none';
-          noResults.style.display = 'block';
-          loadMoreContainer.style.display = 'none';
-        } else {
-          noResults.style.display = 'none';
-          renderListView();
-          renderTimelineView();
+      const { data: posts, error, count } = await query
+        .order('pub_date', { ascending: false })
+        .range(from, to);
 
-          const hasMore = allPosts.length < totalPosts;
-          loadMoreContainer.style.display = hasMore ? 'block' : 'none';
-          loadMoreBtn.textContent = '加载更多';
-          loadMoreBtn.disabled = !hasMore;
-        }
+      if (error) throw error;
+
+      totalPosts = count || 0;
+      allPosts = reset ? (posts || []) : [...allPosts, ...(posts || [])];
+
+      postCountEl.textContent = String(totalPosts);
+
+      if (allPosts.length === 0) {
+        postsContainer.style.display = 'none';
+        document.getElementById('timelineView')!.style.display = 'none';
+        noResults.style.display = 'block';
+        loadMoreContainer.style.display = 'none';
+      } else {
+        noResults.style.display = 'none';
+        renderListView();
+        renderTimelineView();
+
+        const hasMore = allPosts.length < totalPosts;
+        loadMoreContainer.style.display = hasMore ? 'block' : 'none';
+        loadMoreBtn.textContent = '加载更多';
+        loadMoreBtn.disabled = !hasMore;
       }
     } catch (err) {
+      console.error('加载文章失败', err);
       postsContainer.innerHTML = '<p class="text-center text-[#9a9690] text-sm py-12">加载失败，请刷新重试</p>';
     } finally {
       loading = false;
