@@ -1,0 +1,40 @@
+---
+import BlogPost from '../../layouts/BlogPost.astro';
+import { getCollection } from 'astro:content';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog', ({ data }) => !data.draft);
+  return posts.map((post) => {
+    const slug = post.id.replace(/\.(md|mdx)$/, '');
+    return {
+      params: { slug },
+      props: { post },
+    };
+  });
+}
+
+const { post } = Astro.props;
+
+// 使用 post.rendered 获取预渲染的 HTML
+// glob loader 会预渲染内容到 rendered.html
+const rendered = (post as any).rendered;
+let htmlContent = '';
+if (rendered && rendered.html) {
+  htmlContent = rendered.html;
+} else {
+  // 回退到 body (原始 markdown)
+  htmlContent = `<p>${(post as any).body || ''}</p>`;
+}
+---
+
+<BlogPost
+  title={post.data.title}
+  description={post.data.description}
+  pubDate={post.data.pubDate}
+  updatedDate={post.data.updatedDate}
+  heroImage={post.data.heroImage}
+  category={post.data.category}
+  tags={post.data.tags}
+>
+  <Fragment set:html={htmlContent} />
+</BlogPost>

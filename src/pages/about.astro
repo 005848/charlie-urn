@@ -1,0 +1,359 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { SITE_AUTHOR, SITE_TITLE } from '../consts';
+---
+
+<Layout title="关于" description="关于这个数字空间和它的主人">
+  <section class="about-page">
+    <div class="about-hero">
+      <div class="portrait-wrapper">
+        <div class="portrait-frame">
+          <div class="portrait-placeholder">
+            <span class="portrait-initials">{SITE_AUTHOR.charAt(0)}</span>
+          </div>
+        </div>
+        <div class="portrait-glow"></div>
+      </div>
+
+      <h1 class="about-name">{SITE_AUTHOR}</h1>
+      <p class="about-tagline">一个普通的人，一些不普通的记忆</p>
+    </div>
+
+    <div class="about-content">
+      <div class="content-section">
+        <h2 class="section-title">
+          <span class="title-mark">◇</span>
+          关于这个地方
+        </h2>
+        <div class="section-body">
+          <p>
+            这里是 <strong>{SITE_TITLE}</strong>，一个存放记忆与思念的数字空间。
+            在信息飞速流转的时代，我们需要一个安静的角落，
+            让那些珍贵的回忆有处安放，让思念能够缓慢地、温柔地流淌。
+          </p>
+          <p>
+            这个博客不以追热点、求流量为目的。它更像一本私人相册，
+            或者一个安静的书房——你可以随时进来，坐一会儿，
+            读几行字，想起某个人，或者只是发呆。
+          </p>
+        </div>
+      </div>
+
+      <div class="content-section">
+        <h2 class="section-title">
+          <span class="title-mark">◇</span>
+          关于分类
+        </h2>
+        <div class="section-body">
+          <div class="category-intro">
+            <div class="cat-intro-item">
+              <span class="cat-icon">❀</span>
+              <div class="cat-info">
+                <span class="cat-name">回忆</span>
+                <span class="cat-desc">那些过去的人和事，在记忆里永不褪色</span>
+              </div>
+            </div>
+            <div class="cat-intro-item">
+              <span class="cat-icon">✉</span>
+              <div class="cat-info">
+                <span class="cat-name">书信</span>
+                <span class="cat-desc">写给某个人的话，也许永远不会寄出</span>
+              </div>
+            </div>
+            <div class="cat-intro-item">
+              <span class="cat-icon">✎</span>
+              <div class="cat-info">
+                <span class="cat-name">随笔</span>
+                <span class="cat-desc">日常的思考与感悟，碎片式的记录</span>
+              </div>
+            </div>
+            <div class="cat-intro-item">
+              <span class="cat-icon">◐</span>
+              <div class="cat-info">
+                <span class="cat-name">影像</span>
+                <span class="cat-desc">用照片和画面，凝固某个瞬间</span>
+              </div>
+            </div>
+            <div class="cat-intro-item">
+              <span class="cat-icon">♪</span>
+              <div class="cat-info">
+                <span class="cat-name">诗句</span>
+                <span class="cat-desc">喜欢的文字，摘抄和自己写的小诗</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="content-section">
+        <h2 class="section-title">
+          <span class="title-mark">◇</span>
+          一些小事
+        </h2>
+        <div class="section-body">
+          <ul class="facts-list">
+            <li>喜欢下雨天，更喜欢雨停之后泥土的味道</li>
+            <li>收藏旧书，书页上有时间的痕迹</li>
+            <li>拍过很多张天空的照片，每一张都不一样</li>
+            <li>相信有些思念，会以另一种方式抵达</li>
+            <li>觉得慢慢走，也挺好的</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="content-section">
+        <h2 class="section-title">
+          <span class="title-mark">◇</span>
+          联系
+        </h2>
+        <div class="section-body">
+          <p>
+            如果你在这里看到了自己的影子，或者想说点什么，
+            欢迎到<a href="/#guestbook">留言板</a>留下你的话语。
+            每一条留言，都会被认真对待。
+          </p>
+          <p class="signature">
+            —— {SITE_AUTHOR}
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<style>
+.about-page {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 60px 24px;
+}
+
+.about-hero {
+  text-align: center;
+  margin-bottom: 64px;
+}
+
+.portrait-wrapper {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 24px;
+}
+
+.portrait-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid var(--color-accent-primary);
+  padding: 4px;
+  z-index: 1;
+}
+
+.portrait-placeholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    var(--color-bg-secondary) 0%,
+    var(--color-accent-secondary) 100%
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.portrait-initials {
+  font-family: var(--font-serif);
+  font-size: 2.5rem;
+  color: var(--color-text-primary);
+  opacity: 0.6;
+}
+
+.portrait-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 160px;
+  height: 160px;
+  background: radial-gradient(
+    circle,
+    rgba(184, 151, 122, 0.15) 0%,
+    transparent 70%
+  );
+  border-radius: 50%;
+  animation: breathe 4s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+}
+
+.about-name {
+  font-family: var(--font-serif);
+  font-size: 2rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  letter-spacing: 0.1em;
+  margin-bottom: 12px;
+}
+
+.about-tagline {
+  font-size: 0.9rem;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.05em;
+  font-style: italic;
+}
+
+.content-section {
+  margin-bottom: 48px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.title-mark {
+  font-size: 0.9rem;
+  color: var(--color-accent-primary);
+}
+
+.section-body {
+  line-height: 1.9;
+  color: var(--color-text-secondary);
+}
+
+.section-body p {
+  margin-bottom: 1.2em;
+}
+
+.section-body p:last-child {
+  margin-bottom: 0;
+}
+
+.section-body strong {
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.section-body a {
+  color: var(--color-accent-hover);
+  text-decoration: none;
+  border-bottom: 1px solid var(--color-accent-secondary);
+  transition: all 0.3s var(--ease-smooth);
+}
+
+.section-body a:hover {
+  border-bottom-color: var(--color-accent-primary);
+}
+
+/* Category Intro */
+.category-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cat-intro-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px;
+  background-color: var(--color-bg-secondary);
+  border-radius: 8px;
+  transition: all 0.3s var(--ease-smooth);
+}
+
+.cat-intro-item:hover {
+  transform: translateX(4px);
+}
+
+.cat-icon {
+  font-size: 1.4rem;
+  color: var(--color-accent-primary);
+  flex-shrink: 0;
+  width: 32px;
+  text-align: center;
+}
+
+.cat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cat-name {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.cat-desc {
+  font-size: 0.85rem;
+  color: var(--color-text-tertiary);
+  line-height: 1.6;
+}
+
+/* Facts List */
+.facts-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.facts-list li {
+  position: relative;
+  padding-left: 24px;
+  margin-bottom: 12px;
+  color: var(--color-text-secondary);
+}
+
+.facts-list li::before {
+  content: '·';
+  position: absolute;
+  left: 8px;
+  top: 0;
+  color: var(--color-accent-primary);
+  font-size: 1.2em;
+  line-height: 1.6;
+}
+
+.facts-list li:last-child {
+  margin-bottom: 0;
+}
+
+.signature {
+  text-align: right;
+  font-family: var(--font-serif);
+  font-style: italic;
+  color: var(--color-text-tertiary) !important;
+  margin-top: 24px !important;
+}
+
+@media (max-width: 640px) {
+  .about-page {
+    padding: 40px 16px;
+  }
+
+  .about-name {
+    font-size: 1.6rem;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+  }
+}
+</style>

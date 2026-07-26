@@ -1,0 +1,604 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PostCard from '../../components/PostCard.astro';
+import { CATEGORIES } from '../../consts';
+import { getCollection } from 'astro:content';
+
+const posts = (await getCollection('blog', ({ data }) => !data.draft))
+  .sort((a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime());
+
+// 按年份分组
+const postsByYear = new Map<string, typeof posts>();
+for (const post of posts) {
+  const year = post.data.pubDate.getFullYear().toString();
+  if (!postsByYear.has(year)) {
+    postsByYear.set(year, []);
+  }
+  postsByYear.get(year)!.push(post);
+}
+
+// 将 posts 数据序列化为 JSON 供前端筛选使用
+const postsData = posts.map((post) => ({
+  slug: post.slug,
+  title: post.data.title,
+  description: post.data.description,
+  pubDate: post.data.pubDate.toISOString(),
+  category: post.data.category,
+  tags: post.data.tags || [],
+}));
+---
+
+<Layout title="目录" description="所有文章与记忆的目录">
+  <section class="archive-page">
+    <div class="archive-header">
+      <span class="header-mark">◇ ◇ ◇</span>
+      <h1 class="archive-title">记忆目录</h1>
+      <p class="archive-subtitle">共 {posts.length} 篇文字，按时间倒序排列</p>
+    </div>
+
+    <!-- 搜索框 -->
+    <div class="search-container">
+      <div class="search-box">
+        <span class="search-icon">⌕</span>
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="搜索文章标题或内容..."
+          class="search-input"
+        />
+      </div>
+    </div>
+
+    <!-- 分类筛选 -->
+    <div class="category-filter">
+      {CATEGORIES.map((cat) => (
+        <button
+          class:list={['category-btn', { active: cat.id === 'all' }]}
+          data-category={cat.id}
+        >
+          <span class="cat-icon">{cat.icon}</span>
+          <span class="cat-label">{cat.label}</span>
+        </button>
+      ))}
+    </div>
+
+    <!-- 视图切换 -->
+    <div class="view-toggle">
+      <button class="view-btn active" data-view="list" title="列表视图">
+        <span class="view-icon">≡</span>
+        <span>列表</span>
+      </button>
+      <button class="view-btn" data-view="timeline" title="时间线视图">
+        <span class="view-icon">⌇</span>
+        <span>时间线</span>
+      </button>
+    </div>
+
+    <!-- 列表视图 -->
+    <div class="posts-container list-view" id="postsContainer">
+      {Array.from(postsByYear.entries()).map(([year, yearPosts]) => (
+        <div class="year-group" data-year={year}>
+          <h2 class="year-title">
+            <span class="year-num">{year}</span>
+            <span class="year-count">{yearPosts.length} 篇</span>
+          </h2>
+          <div class="year-posts">
+            {yearPosts.map((post) => (
+              <PostCard post={post} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <!-- 时间线视图 -->
+    <div class="posts-container timeline-view" id="timelineView" style="display: none;">
+      <div class="timeline-line"></div>
+      {posts.map((post, index) => (
+        <div class="timeline-item" data-category={post.data.category}>
+          <div class="timeline-dot">
+            <span class="dot-inner"></span>
+          </div>
+          <div class="timeline-content">
+            <a href={`/blog/${post.slug}`} class="timeline-link">
+              <span class="timeline-date">
+                {post.data.pubDate.getMonth() + 1}月{post.data.pubDate.getDate()}日
+              </span>
+              <span class="timeline-title">{post.data.title}</span>
+            </a>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <!-- 无结果提示 -->
+    <div class="no-results" id="noResults" style="display: none;">
+      <p class="no-results-icon">◇</p>
+      <p class="no-results-text">没有找到相关文章</p>
+      <p class="no-results-sub">换个关键词试试？</p>
+    </div>
+  </section>
+</Layout>
+
+<style>
+.archive-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 60px 24px;
+}
+
+.archive-header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.header-mark {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--color-accent-primary);
+  letter-spacing: 0.5em;
+  margin-bottom: 16px;
+}
+
+.archive-title {
+  font-family: var(--font-serif);
+  font-size: 2.2rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  letter-spacing: 0.1em;
+  margin-bottom: 12px;
+}
+
+.archive-subtitle {
+  font-size: 0.9rem;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.05em;
+}
+
+/* Search */
+.search-container {
+  margin-bottom: 32px;
+}
+
+.search-box {
+  position: relative;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.search-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-tertiary);
+  font-size: 1rem;
+}
+
+.search-input {
+  width: 100%;
+  padding: 12px 16px 12px 42px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: 0.9rem;
+  transition: all 0.3s var(--ease-smooth);
+  outline: none;
+}
+
+.search-input:focus {
+  border-color: var(--color-accent-primary);
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(184, 151, 122, 0.1);
+}
+
+/* Category Filter */
+.category-filter {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+
+.category-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.3s var(--ease-smooth);
+}
+
+.category-btn:hover {
+  border-color: var(--color-accent-primary);
+  color: var(--color-accent-primary);
+}
+
+.category-btn.active {
+  background-color: var(--color-accent-primary);
+  border-color: var(--color-accent-primary);
+  color: #fff;
+}
+
+.cat-icon {
+  font-size: 0.85rem;
+}
+
+/* View Toggle */
+.view-toggle {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-bottom: 24px;
+}
+
+.view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  color: var(--color-text-tertiary);
+  font-family: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.3s var(--ease-smooth);
+}
+
+.view-btn:hover {
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-secondary);
+}
+
+.view-btn.active {
+  color: var(--color-accent-primary);
+  background-color: rgba(184, 151, 122, 0.08);
+}
+
+.view-icon {
+  font-size: 0.9rem;
+}
+
+/* List View */
+.year-group {
+  margin-bottom: 48px;
+}
+
+.year-group:last-child {
+  margin-bottom: 0;
+}
+
+.year-title {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.year-num {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.year-count {
+  font-size: 0.8rem;
+  color: var(--color-text-tertiary);
+}
+
+/* Timeline View */
+.timeline-view {
+  position: relative;
+  padding-left: 24px;
+}
+
+.timeline-line {
+  position: absolute;
+  left: 7px;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    var(--color-accent-primary),
+    var(--color-border)
+  );
+}
+
+.timeline-item {
+  position: relative;
+  padding-bottom: 24px;
+  display: flex;
+  gap: 16px;
+}
+
+.timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: -24px;
+  top: 4px;
+  width: 15px;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dot-inner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-bg-primary);
+  border: 2px solid var(--color-accent-primary);
+  transition: all 0.3s var(--ease-smooth);
+}
+
+.timeline-item:hover .dot-inner {
+  background-color: var(--color-accent-primary);
+  transform: scale(1.2);
+}
+
+.timeline-content {
+  flex: 1;
+}
+
+.timeline-link {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  text-decoration: none;
+  color: inherit;
+  padding: 4px 0;
+  transition: all 0.3s var(--ease-smooth);
+}
+
+.timeline-link:hover {
+  padding-left: 8px;
+}
+
+.timeline-link:hover .timeline-title {
+  color: var(--color-accent-hover);
+}
+
+.timeline-date {
+  font-size: 0.8rem;
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  width: 60px;
+}
+
+.timeline-title {
+  font-size: 0.95rem;
+  color: var(--color-text-primary);
+  transition: color 0.3s var(--ease-smooth);
+}
+
+/* No Results */
+.no-results {
+  text-align: center;
+  padding: 80px 24px;
+}
+
+.no-results-icon {
+  font-size: 2rem;
+  color: var(--color-text-tertiary);
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.no-results-text {
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+}
+
+.no-results-sub {
+  font-size: 0.85rem;
+  color: var(--color-text-tertiary);
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (max-width: 640px) {
+  .archive-page {
+    padding: 40px 16px;
+  }
+
+  .archive-title {
+    font-size: 1.6rem;
+  }
+
+  .timeline-date {
+    width: 50px;
+    font-size: 0.75rem;
+  }
+
+  .timeline-title {
+    font-size: 0.9rem;
+  }
+}
+</style>
+
+<script>
+  const postsData = JSON.parse(
+    document.getElementById('postsData')?.textContent || '[]'
+  );
+
+  // 从 URL 参数获取初始分类
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialCategory = urlParams.get('category') || 'all';
+
+  let currentCategory = initialCategory;
+  let currentView = 'list';
+  let searchQuery = '';
+
+  const categoryBtns = document.querySelectorAll('.category-btn');
+  const viewBtns = document.querySelectorAll('.view-btn');
+  const searchInput = document.getElementById('searchInput') as HTMLInputElement;
+  const listView = document.getElementById('postsContainer');
+  const timelineView = document.getElementById('timelineView');
+  const noResults = document.getElementById('noResults');
+
+  // 初始化分类按钮状态
+  categoryBtns.forEach((btn) => {
+    const cat = btn.getAttribute('data-category');
+    if (cat === currentCategory) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+
+  // 分类切换
+  categoryBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const cat = btn.getAttribute('data-category');
+      if (!cat) return;
+
+      currentCategory = cat;
+
+      categoryBtns.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      filterPosts();
+    });
+  });
+
+  // 视图切换
+  viewBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const view = btn.getAttribute('data-view');
+      if (!view || view === currentView) return;
+
+      currentView = view;
+
+      viewBtns.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      if (view === 'list') {
+        listView!.style.display = 'block';
+        timelineView!.style.display = 'none';
+      } else {
+        listView!.style.display = 'none';
+        timelineView!.style.display = 'block';
+      }
+    });
+  });
+
+  // 搜索
+  let searchTimeout: number;
+  searchInput?.addEventListener('input', (e) => {
+    const target = e.target as HTMLInputElement;
+    clearTimeout(searchTimeout);
+    searchTimeout = window.setTimeout(() => {
+      searchQuery = target.value.toLowerCase().trim();
+      filterPosts();
+    }, 200);
+  });
+
+  function filterPosts() {
+    const allYearGroups = document.querySelectorAll('.year-group');
+    const allTimelineItems = document.querySelectorAll('.timeline-item');
+    let visibleCount = 0;
+
+    // 列表视图过滤
+    allYearGroups.forEach((group) => {
+      const yearPosts = group.querySelector('.year-posts');
+      const cards = yearPosts?.querySelectorAll('.post-card') || [];
+      let yearVisible = 0;
+
+      cards.forEach((card) => {
+        const link = card.querySelector('a');
+        const href = link?.getAttribute('href') || '';
+        const slug = href.replace('/blog/', '');
+        const post = postsData.find((p: any) => p.slug === slug);
+
+        if (!post) {
+          (card as HTMLElement).style.display = 'block';
+          yearVisible++;
+          return;
+        }
+
+        const matchCategory =
+          currentCategory === 'all' || post.category === currentCategory;
+        const matchSearch =
+          !searchQuery ||
+          post.title.toLowerCase().includes(searchQuery) ||
+          post.description.toLowerCase().includes(searchQuery) ||
+          post.tags?.some((t: string) => t.toLowerCase().includes(searchQuery));
+
+        if (matchCategory && matchSearch) {
+          (card as HTMLElement).style.display = 'block';
+          yearVisible++;
+        } else {
+          (card as HTMLElement).style.display = 'none';
+        }
+      });
+
+      if (yearVisible > 0) {
+        (group as HTMLElement).style.display = 'block';
+        const countEl = group.querySelector('.year-count');
+        if (countEl) countEl.textContent = `${yearVisible} 篇`;
+        visibleCount += yearVisible;
+      } else {
+        (group as HTMLElement).style.display = 'none';
+      }
+    });
+
+    // 时间线视图过滤
+    allTimelineItems.forEach((item) => {
+      const category = item.getAttribute('data-category');
+      const titleEl = item.querySelector('.timeline-title');
+      const title = titleEl?.textContent?.toLowerCase() || '';
+
+      const matchCategory =
+        currentCategory === 'all' || category === currentCategory;
+      const matchSearch = !searchQuery || title.includes(searchQuery);
+
+      if (matchCategory && matchSearch) {
+        (item as HTMLElement).style.display = 'flex';
+      } else {
+        (item as HTMLElement).style.display = 'none';
+      }
+    });
+
+    // 无结果提示
+    const timelineVisible = Array.from(allTimelineItems).filter(
+      (item) => (item as HTMLElement).style.display !== 'none'
+    ).length;
+
+    const totalVisible = currentView === 'list' ? visibleCount : timelineVisible;
+
+    if (noResults) {
+      noResults.style.display = totalVisible === 0 ? 'block' : 'none';
+    }
+  }
+
+  // 初始过滤
+  filterPosts();
+
+  // 嵌入数据
+</script>
+
+<script type="application/json" id="postsData">{postsData}</script>

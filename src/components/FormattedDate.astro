@@ -1,0 +1,25 @@
+---
+interface Props {
+  date: Date;
+  format?: 'full' | 'short' | 'year';
+}
+
+const { date, format = 'full' } = Astro.props;
+
+const year = date.getFullYear();
+const month = String(date.getMonth() + 1).padStart(2, '0');
+const day = String(date.getDate()).padStart(2, '0');
+
+let displayText = '';
+if (format === 'full') {
+  displayText = `${year}年${month}月${day}日`;
+} else if (format === 'short') {
+  displayText = `${year}.${month}.${day}`;
+} else {
+  displayText = `${year}`;
+}
+---
+
+<time datetime={date.toISOString()}>
+  {displayText}
+</time>

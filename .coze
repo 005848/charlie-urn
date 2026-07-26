@@ -1,0 +1,10 @@
+[project]
+requires = ["nodejs-24"]
+
+[dev]
+build = ["pnpm", "install"]
+run = ["sh", "-c", "pnpm exec astro dev --port ${DEPLOY_RUN_PORT} --host"]
+
+[deploy]
+build = ["pnpm", "run", "build"]
+run = ["sh", "-c", "pnpm run preview --port ${DEPLOY_RUN_PORT} --host"]

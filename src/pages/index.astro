@@ -1,0 +1,566 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PostCard from '../components/PostCard.astro';
+import Guestbook from '../components/Guestbook.astro';
+import FormattedDate from '../components/FormattedDate.astro';
+import { CATEGORIES } from '../consts';
+import { getCollection } from 'astro:content';
+
+const posts = (await getCollection('blog', ({ data }) => !data.draft))
+  .sort((a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime());
+
+const latestPosts = posts.slice(0, 4);
+
+const totalWords = posts.reduce((acc, post) => {
+  // 粗略估算字数
+  return acc + (post.body?.length || 0);
+}, 0);
+---
+
+<Layout>
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-bg">
+      <div class="hero-particles">
+        <span class="particle p1"></span>
+        <span class="particle p2"></span>
+        <span class="particle p3"></span>
+        <span class="particle p4"></span>
+        <span class="particle p5"></span>
+      </div>
+      <div class="hero-glow"></div>
+    </div>
+
+    <div class="hero-content">
+      <div class="hero-symbol animate-fade-in">
+        <span class="symbol-ornament left">◇</span>
+        <span class="symbol-dot animate-breathe"></span>
+        <span class="symbol-ornament right">◇</span>
+      </div>
+
+      <h1 class="hero-title animate-fade-in-up">
+        Charlie的电子骨灰盒
+      </h1>
+
+      <p class="hero-subtitle animate-fade-in-up delay-200">
+        一个存放记忆与思念的数字空间
+      </p>
+
+      <p class="hero-quote animate-fade-in-up delay-300">
+        "时光会带走很多东西，<br />但文字会替我们记住。"
+      </p>
+
+      <div class="hero-meta animate-fade-in-up delay-400">
+        <div class="meta-item">
+          <span class="meta-num">{posts.length}</span>
+          <span class="meta-label">篇文章</span>
+        </div>
+        <span class="meta-divider">·</span>
+        <div class="meta-item">
+          <span class="meta-num">{CATEGORIES.length - 1}</span>
+          <span class="meta-label">个分类</span>
+        </div>
+        <span class="meta-divider">·</span>
+        <div class="meta-item">
+          <span class="meta-num">{Math.round(totalWords / 1000)}k</span>
+          <span class="meta-label">字记忆</span>
+        </div>
+      </div>
+
+      <div class="hero-scroll animate-fade-in-up delay-500">
+        <span class="scroll-text">向下翻阅</span>
+        <span class="scroll-line"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Latest Posts Section -->
+  <section class="latest-section">
+    <div class="section-inner">
+      <div class="section-heading">
+        <span class="heading-mark">—</span>
+        <h2 class="heading-title">最近的文字</h2>
+        <span class="heading-sub">Latest Memories</span>
+      </div>
+
+      <div class="posts-grid">
+        {latestPosts.map((post) => (
+          <PostCard post={post} />
+        ))}
+      </div>
+
+      <div class="section-cta">
+        <a href="/blog" class="cta-link">
+          <span>浏览全部文章</span>
+          <span class="cta-arrow">→</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Categories Section -->
+  <section class="categories-section">
+    <div class="section-inner">
+      <div class="section-heading">
+        <span class="heading-mark">—</span>
+        <h2 class="heading-title">记忆的分类</h2>
+        <span class="heading-sub">Categories</span>
+      </div>
+
+      <div class="categories-grid">
+        {CATEGORIES.filter(c => c.id !== 'all').map((cat, index) => {
+          const count = posts.filter(p => p.data.category === cat.id).length;
+          return (
+            <a href={`/blog?category=${cat.id}`} class="category-card" style={`animation-delay: ${index * 100}ms`}>
+              <span class="cat-icon">{cat.icon}</span>
+              <span class="cat-name">{cat.label}</span>
+              <span class="cat-count">{count} 篇</span>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  </section>
+
+  <!-- Timeline Teaser -->
+  <section class="timeline-teaser">
+    <div class="section-inner">
+      <div class="timeline-content">
+        <div class="timeline-quote">
+          <p className="quote-text">
+            "人的一生会死去两次，<br />
+            第一次是停止呼吸的时候，<br />
+            第二次是最后一个记得他的人忘记的时候。"
+          </p>
+          <p className="quote-source">— 《寻梦环游记》</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Guestbook -->
+  <Guestbook />
+</Layout>
+
+<style>
+/* Hero Section */
+.hero {
+  position: relative;
+  min-height: calc(100vh - 72px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 80px 24px;
+}
+
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hero-glow {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(
+    circle,
+    rgba(184, 151, 122, 0.08) 0%,
+    transparent 70%
+  );
+  border-radius: 50%;
+}
+
+.hero-particles {
+  position: absolute;
+  inset: 0;
+}
+
+.particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background-color: var(--color-accent-primary);
+  border-radius: 50%;
+  opacity: 0;
+  animation: float 8s ease-in-out infinite;
+}
+
+.p1 { top: 20%; left: 20%; animation-delay: 0s; }
+.p2 { top: 60%; left: 15%; animation-delay: 2s; width: 3px; height: 3px; }
+.p3 { top: 30%; right: 25%; animation-delay: 4s; }
+.p4 { top: 70%; right: 20%; animation-delay: 1s; width: 3px; height: 3px; }
+.p5 { top: 80%; left: 40%; animation-delay: 3s; }
+
+@keyframes float {
+  0%, 100% { opacity: 0; transform: translateY(20px); }
+  50% { opacity: 0.6; transform: translateY(-20px); }
+}
+
+.hero-content {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  max-width: 680px;
+}
+
+.hero-symbol {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.symbol-ornament {
+  color: var(--color-accent-primary);
+  font-size: 0.8rem;
+  opacity: 0.6;
+}
+
+.symbol-dot {
+  width: 12px;
+  height: 12px;
+  background-color: var(--color-accent-primary);
+  border-radius: 50%;
+  box-shadow: 0 0 20px rgba(184, 151, 122, 0.5);
+}
+
+.hero-title {
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 6vw, 3.2rem);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  letter-spacing: 0.08em;
+  margin-bottom: 20px;
+  line-height: 1.3;
+}
+
+.hero-subtitle {
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.15em;
+  margin-bottom: 48px;
+}
+
+.hero-quote {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  line-height: 2;
+  color: var(--color-text-secondary);
+  font-style: italic;
+  margin-bottom: 56px;
+}
+
+.hero-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 64px;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.meta-num {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.meta-label {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.1em;
+}
+
+.meta-divider {
+  color: var(--color-text-tertiary);
+  font-size: 0.8rem;
+  opacity: 0.5;
+}
+
+.hero-scroll {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.scroll-text {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.2em;
+}
+
+.scroll-line {
+  width: 1px;
+  height: 40px;
+  background: linear-gradient(
+    to bottom,
+    var(--color-text-tertiary),
+    transparent
+  );
+  animation: scrollLine 2s ease-in-out infinite;
+}
+
+@keyframes scrollLine {
+  0%, 100% { opacity: 0.3; transform: scaleY(1); }
+  50% { opacity: 1; transform: scaleY(1.2); }
+}
+
+/* Section Common */
+.section-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.section-heading {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.heading-mark {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--color-accent-primary);
+  letter-spacing: 0.3em;
+  margin-bottom: 12px;
+}
+
+.heading-title {
+  font-family: var(--font-serif);
+  font-size: 1.8rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+}
+
+.heading-sub {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/* Latest Posts */
+.latest-section {
+  padding: 100px 0;
+}
+
+.posts-grid {
+  display: flex;
+  flex-direction: column;
+}
+
+.section-cta {
+  text-align: center;
+  margin-top: 48px;
+}
+
+.cta-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 28px;
+  border: 1px solid var(--color-accent-primary);
+  border-radius: 6px;
+  color: var(--color-accent-primary);
+  text-decoration: none;
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+  transition: all 0.3s var(--ease-smooth);
+}
+
+.cta-link:hover {
+  background-color: var(--color-accent-primary);
+  color: #fff;
+}
+
+.cta-arrow {
+  transition: transform 0.3s var(--ease-smooth);
+}
+
+.cta-link:hover .cta-arrow {
+  transform: translateX(4px);
+}
+
+/* Categories */
+.categories-section {
+  padding: 80px 0;
+  background-color: var(--color-bg-secondary);
+}
+
+.categories-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+.category-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 16px;
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border-soft);
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.3s var(--ease-smooth);
+  animation: fadeInUp 0.6s var(--ease-smooth) both;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.category-card:hover {
+  border-color: var(--color-accent-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(184, 151, 122, 0.1);
+}
+
+.cat-icon {
+  font-size: 1.5rem;
+  color: var(--color-accent-primary);
+}
+
+.cat-name {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  color: var(--color-text-primary);
+  letter-spacing: 0.05em;
+}
+
+.cat-count {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+}
+
+/* Timeline Teaser */
+.timeline-teaser {
+  padding: 120px 24px;
+  background: linear-gradient(
+    180deg,
+    var(--color-bg-secondary) 0%,
+    var(--color-bg-primary) 100%
+  );
+}
+
+.timeline-content {
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.timeline-quote {
+  position: relative;
+  padding: 40px 0;
+}
+
+.timeline-quote::before,
+.timeline-quote::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 1px;
+  background-color: var(--color-accent-primary);
+}
+
+.timeline-quote::before {
+  top: 0;
+}
+
+.timeline-quote::after {
+  bottom: 0;
+}
+
+.quote-text {
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  line-height: 2.2;
+  color: var(--color-text-secondary);
+  font-style: italic;
+  margin-bottom: 20px;
+}
+
+.quote-source {
+  font-size: 0.85rem;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.1em;
+}
+
+@media (max-width: 768px) {
+  .hero {
+    min-height: auto;
+    padding: 60px 24px;
+  }
+
+  .latest-section {
+    padding: 60px 0;
+  }
+
+  .categories-section {
+    padding: 60px 0;
+  }
+
+  .timeline-teaser {
+    padding: 80px 24px;
+  }
+
+  .categories-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+</style>
+
+<script>
+  // 滚动渐入效果
+  const observerOptions = {
+    threshold: 0.1,
+    rootMargin: '0px 0px -50px 0px',
+  };
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        entry.target.style.opacity = '1';
+        entry.target.style.transform = 'translateY(0)';
+      }
+    });
+  }, observerOptions);
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const elements = document.querySelectorAll(
+      '.section-heading, .posts-grid, .categories-grid, .timeline-content'
+    );
+    elements.forEach((el) => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(30px)';
+      el.style.transition = 'opacity 0.8s ease, transform 0.8s ease';
+      observer.observe(el);
+    });
+  });
+</script>

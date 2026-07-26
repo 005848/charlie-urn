@@ -1,0 +1,106 @@
+---
+import { SITE_TITLE, SITE_AUTHOR } from '../consts';
+
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-symbol">
+      <span class="symbol-line"></span>
+      <span class="symbol-dot"></span>
+      <span class="symbol-line"></span>
+    </div>
+
+    <p class="footer-quote">
+      "有些故事不会随风而逝，它们只是换了一种方式存在。"
+    </p>
+
+    <div class="footer-info">
+      <span class="footer-title">{SITE_TITLE}</span>
+      <span class="footer-sep">·</span>
+      <span class="footer-year">{year}</span>
+    </div>
+
+    <p class="footer-meta">
+      由 {SITE_AUTHOR} 珍藏 · 记忆永不褪色
+    </p>
+  </div>
+</footer>
+
+<style>
+.site-footer {
+  margin-top: 120px;
+  padding: 60px 24px 40px;
+  background-color: var(--color-bg-secondary);
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.footer-inner {
+  max-width: 680px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.footer-symbol {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.symbol-line {
+  width: 40px;
+  height: 1px;
+  background-color: var(--color-text-tertiary);
+}
+
+.symbol-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-accent-primary);
+  animation: breathe 4s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.footer-quote {
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 32px;
+  font-style: italic;
+  line-height: 1.8;
+}
+
+.footer-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.footer-title {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.footer-sep {
+  color: var(--color-text-tertiary);
+}
+
+.footer-meta {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.05em;
+}
+</style>
