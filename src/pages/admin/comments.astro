@@ -22,7 +22,19 @@ import Layout from '@layouts/Layout.astro';
     </header>
 
     <div class="max-w-5xl mx-auto px-6 py-10">
-      <h2 class="text-xl font-serif text-[#2c2a28] mb-8">留言管理</h2>
+      <div class="flex items-center justify-between mb-8">
+        <h2 class="text-xl font-serif text-[#2c2a28]">留言管理</h2>
+        <button id="approve-all-btn" class="px-4 py-2 text-sm bg-[#b8977a] text-white rounded hover:bg-[#8c7159] transition-colors hidden">
+          一键审批全部待审核
+        </button>
+      </div>
+
+      <div class="flex gap-2 mb-6">
+        <button class="filter-btn px-3 py-1.5 text-sm rounded border border-[#e5e2dd] text-[#6b6864] hover:text-[#b8977a] hover:border-[#b8977a] transition-colors active" data-filter="all">全部</button>
+        <button class="filter-btn px-3 py-1.5 text-sm rounded border border-[#e5e2dd] text-[#6b6864] hover:text-[#b8977a] hover:border-[#b8977a] transition-colors" data-filter="pending">待审核</button>
+        <button class="filter-btn px-3 py-1.5 text-sm rounded border border-[#e5e2dd] text-[#6b6864] hover:text-[#b8977a] hover:border-[#b8977a] transition-colors" data-filter="approved">已通过</button>
+        <button class="filter-btn px-3 py-1.5 text-sm rounded border border-[#e5e2dd] text-[#6b6864] hover:text-[#b8977a] hover:border-[#b8977a] transition-colors" data-filter="rejected">已拒绝</button>
+      </div>
 
       <div id="comments-list" class="space-y-4">
         <p class="text-center py-12 text-[#9a9690] text-sm">加载中...</p>
@@ -44,6 +56,8 @@ import Layout from '@layouts/Layout.astro';
     return supabase;
   }
 
+  let currentFilter = 'all';
+
   // 鉴权
   (async () => {
     const sb = getSupabase();
@@ -51,6 +65,8 @@ import Layout from '@layouts/Layout.astro';
     const { data } = await sb.auth.getSession();
     if (!data?.session) {
       window.location.href = '/admin/login';
+    } else {
+      await loadComments();
     }
   })();
 
@@ -58,14 +74,26 @@ import Layout from '@layouts/Layout.astro';
     const sb = getSupabase();
     if (!sb) return;
 
-    const { data: comments, error } = await sb
-      .from('guestbook_comments')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const list = document.getElementById('comments-list')!;
+    list.innerHTML = `<p class="text-center py-12 text-[#9a9690] text-sm">加载中...</p>`;
+
+    let query = sb.from('guestbook_comments').select('*');
+    if (currentFilter !== 'all') {
+      query = query.eq('status', currentFilter);
+    }
+
+    const { data: comments, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
-      console.error('加载留言失败', error);
+      list.innerHTML = `<p class="text-center py-12 text-red-500 text-sm">加载失败：${error.message}</p>`;
       return;
+    }
+
+    // 更新一键审批按钮显示
+    const pendingCount = (comments || []).filter(c => c.status === 'pending').length;
+    const approveAllBtn = document.getElementById('approve-all-btn');
+    if (approveAllBtn) {
+      approveAllBtn.style.display = currentFilter === 'all' || currentFilter === 'pending' ? 'inline-block' : 'none';
     }
 
     renderComments(comments || []);
@@ -78,7 +106,15 @@ import Layout from '@layouts/Layout.astro';
       return;
     }
 
-    list.innerHTML = comments.map(c => `
+    const statusMap: Record<string, { label: string; class: string }> = {
+      pending: { label: '待审核', class: 'bg-amber-100 text-amber-700' },
+      approved: { label: '已通过', class: 'bg-green-100 text-green-700' },
+      rejected: { label: '已拒绝', class: 'bg-gray-100 text-gray-600' },
+    };
+
+    list.innerHTML = comments.map(c => {
+      const status = statusMap[c.status] || statusMap.pending;
+      return `
       <div class="bg-white border border-[#e5e2dd] rounded-lg p-5">
         <div class="flex items-start justify-between mb-3">
           <div class="flex items-center gap-3">
@@ -86,15 +122,46 @@ import Layout from '@layouts/Layout.astro';
               ${c.author_name?.charAt(0) || '?'}
             </div>
             <div>
-              <div class="font-medium text-[#2c2a28] text-sm">${escapeHtml(c.author_name)}</div>
+              <div class="font-medium text-[#2c2a28] text-sm flex items-center gap-2">
+                ${escapeHtml(c.author_name)}
+                <span class="text-xs px-2 py-0.5 rounded ${status.class}">${status.label}</span>
+              </div>
               <div class="text-xs text-[#9a9690]">${formatDate(c.created_at)}</div>
             </div>
           </div>
-          <button class="delete-btn text-xs text-red-500 hover:underline" data-id="${c.id}">删除</button>
+          <div class="flex gap-2 text-xs">
+            ${c.status === 'pending' ? `
+              <button class="approve-btn text-green-600 hover:underline" data-id="${c.id}">通过</button>
+              <button class="reject-btn text-[#9a9690] hover:underline" data-id="${c.id}">拒绝</button>
+            ` : c.status === 'rejected' ? `
+              <button class="approve-btn text-green-600 hover:underline" data-id="${c.id}">恢复</button>
+            ` : `
+              <button class="reject-btn text-[#9a9690] hover:underline" data-id="${c.id}">撤回</button>
+            `}
+            <button class="delete-btn text-red-500 hover:underline" data-id="${c.id}">删除</button>
+          </div>
         </div>
         <p class="text-sm text-[#2c2a28] leading-relaxed whitespace-pre-wrap">${escapeHtml(c.content)}</p>
       </div>
-    `).join('');
+    `;
+    }).join('');
+
+    // 绑定审批按钮
+    list.querySelectorAll('.approve-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = (e.target as HTMLButtonElement).dataset.id;
+        if (!id) return;
+        await updateCommentStatus(id, 'approved');
+      });
+    });
+
+    list.querySelectorAll('.reject-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = (e.target as HTMLButtonElement).dataset.id;
+        if (!id) return;
+        await updateCommentStatus(id, 'rejected');
+      });
+    });
 
     list.querySelectorAll('.delete-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
@@ -119,6 +186,52 @@ import Layout from '@layouts/Layout.astro';
     });
   }
 
+  async function updateCommentStatus(id: string, status: string) {
+    const sb = getSupabase();
+    if (!sb) return;
+
+    const { error } = await sb
+      .from('guestbook_comments')
+      .update({ status })
+      .eq('id', id);
+
+    if (error) {
+      alert('操作失败：' + error.message);
+    } else {
+      loadComments();
+    }
+  }
+
+  // 一键审批
+  document.getElementById('approve-all-btn')?.addEventListener('click', async () => {
+    if (!confirm('确定要审批所有待审核的留言吗？')) return;
+
+    const sb = getSupabase();
+    if (!sb) return;
+
+    const { error } = await sb
+      .from('guestbook_comments')
+      .update({ status: 'approved' })
+      .eq('status', 'pending');
+
+    if (error) {
+      alert('批量审批失败：' + error.message);
+    } else {
+      alert('批量审批成功！');
+      loadComments();
+    }
+  });
+
+  // 筛选按钮
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active', 'text-[#b8977a]', 'border-[#b8977a]'));
+      btn.classList.add('active', 'text-[#b8977a]', 'border-[#b8977a]');
+      currentFilter = btn.getAttribute('data-filter') || 'all';
+      loadComments();
+    });
+  });
+
   function escapeHtml(str: string): string {
     const div = document.createElement('div');
     div.textContent = str || '';
@@ -135,6 +248,4 @@ import Layout from '@layouts/Layout.astro';
     if (sb) await sb.auth.signOut();
     window.location.href = '/admin/login';
   });
-
-  setTimeout(loadComments, 400);
 </script>
