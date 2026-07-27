@@ -31,34 +31,55 @@ import Layout from '../../layouts/Layout.astro';
 </Layout>
 
 <script>
-  import { getSupabase } from '../../lib/supabase/client';
+  import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-  const supabase = getSupabase();
+  let supabase: SupabaseClient | null = null;
   let categories: any[] = [];
 
-  async function checkAdminAuth() {
-    const { data } = await supabase.auth.getSession();
+  function getSupabase(): SupabaseClient {
+    if (supabase) return supabase;
+    const url = document.querySelector('meta[name="x-supabase-url"]')?.getAttribute('content') || '';
+    const anonKey = document.querySelector('meta[name="x-supabase-anon-key"]')?.getAttribute('content') || '';
+    if (!url || !anonKey) {
+      console.error('Supabase 配置未找到，请检查环境变量');
+    }
+    supabase = createClient(url, anonKey);
+    return supabase;
+  }
+
+  async function checkAdminAuth(): Promise<boolean> {
+    const sb = getSupabase();
+    const { data } = await sb.auth.getSession();
     return !!data.session;
   }
 
   async function init() {
-    const isAuthed = await checkAdminAuth();
-    if (!isAuthed) {
-      window.location.href = '/admin/login';
-      return;
+    try {
+      const isAuthed = await checkAdminAuth();
+      if (!isAuthed) {
+        window.location.href = '/admin/login';
+        return;
+      }
+      await loadCategories();
+    } catch (e: any) {
+      console.error('初始化失败:', e);
+      const listEl = document.getElementById('categoryList');
+      if (listEl) listEl.innerHTML = `<p style="color:#c9513f">加载失败：${e?.message || '未知错误'}</p>`;
     }
-    loadCategories();
   }
 
   async function loadCategories() {
-    const { data, error } = await supabase
+    const sb = getSupabase();
+    const { data, error } = await sb
       .from('categories')
       .select('*')
       .order('sort_order', { ascending: true });
 
+    const listEl = document.getElementById('categoryList');
+    if (!listEl) return;
+
     if (error) {
-      document.getElementById('categoryList')!.innerHTML =
-        `<p class="error-text">加载失败：${error.message}</p>`;
+      listEl.innerHTML = `<p style="color:#c9513f">加载失败：${error.message}</p>`;
       return;
     }
 
@@ -67,27 +88,75 @@ import Layout from '../../layouts/Layout.astro';
   }
 
   function renderCategories() {
-    const list = document.getElementById('categoryList')!;
+    const list = document.getElementById('categoryList');
+    if (!list) return;
+
     if (categories.length === 0) {
-      list.innerHTML = '<p class="text-muted">暂无分类，添加一个吧～</p>';
+      list.innerHTML = '<p style="color:#9a9690">暂无分类，添加一个吧</p>';
       return;
     }
 
     list.innerHTML = categories.map((cat: any) => `
       <div class="category-item" data-id="${cat.id}">
         <div class="cat-info">
-          <span class="cat-name">${cat.name}</span>
-          <span class="cat-slug">${cat.slug}</span>
-          ${cat.description ? `<span class="cat-desc">${cat.description}</span>` : ''}
+          <span class="cat-name">${escapeHtml(cat.name)}</span>
+          <span class="cat-slug">${escapeHtml(cat.slug)}</span>
+          ${cat.description ? `<span class="cat-desc">${escapeHtml(cat.description)}</span>` : ''}
         </div>
         <div class="cat-actions">
-          <button class="btn-small" onclick="editCategory('${cat.id}')">编辑</button>
-          <button class="btn-danger btn-small" onclick="deleteCategory('${cat.id}')">删除</button>
+          <button class="btn-edit btn-small" data-id="${cat.id}" data-action="edit">编辑</button>
+          <button class="btn-delete btn-small" data-id="${cat.id}" data-action="delete">删除</button>
         </div>
       </div>
     `).join('');
+
+    // 绑定事件
+    list.querySelectorAll('.btn-edit').forEach(btn => {
+      btn.addEventListener('click', () => editCategory((btn as HTMLElement).dataset.id || ''));
+    });
+    list.querySelectorAll('.btn-delete').forEach(btn => {
+      btn.addEventListener('click', () => deleteCategory((btn as HTMLElement).dataset.id || ''));
+    });
   }
 
+  function escapeHtml(str: string): string {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  async function deleteCategory(id: string) {
+    if (!confirm('确定删除这个分类吗？')) return;
+    const sb = getSupabase();
+    const { error } = await sb.from('categories').delete().eq('id', id);
+    if (error) {
+      alert('删除失败：' + error.message);
+      return;
+    }
+    loadCategories();
+  }
+
+  async function editCategory(id: string) {
+    const cat = categories.find(c => c.id === id);
+    if (!cat) return;
+
+    const newName = prompt('修改分类名称：', cat.name);
+    if (newName === null || !newName.trim()) return;
+
+    const sb = getSupabase();
+    const { error } = await sb
+      .from('categories')
+      .update({ name: newName.trim() })
+      .eq('id', id);
+
+    if (error) {
+      alert('修改失败：' + error.message);
+      return;
+    }
+    loadCategories();
+  }
+
+  // 添加分类按钮
   document.getElementById('addCatBtn')?.addEventListener('click', async () => {
     const name = (document.getElementById('catName') as HTMLInputElement).value.trim();
     const slug = (document.getElementById('catSlug') as HTMLInputElement).value.trim();
@@ -98,7 +167,8 @@ import Layout from '../../layouts/Layout.astro';
       return;
     }
 
-    const { error } = await supabase.from('categories').insert([
+    const sb = getSupabase();
+    const { error } = await sb.from('categories').insert([
       { name, slug, description: description || null }
     ]);
 
@@ -112,35 +182,6 @@ import Layout from '../../layouts/Layout.astro';
     (document.getElementById('catDesc') as HTMLInputElement).value = '';
     loadCategories();
   });
-
-  (window as any).deleteCategory = async (id: string) => {
-    if (!confirm('确定删除这个分类吗？')) return;
-    const { error } = await supabase.from('categories').delete().eq('id', id);
-    if (error) {
-      alert('删除失败：' + error.message);
-      return;
-    }
-    loadCategories();
-  };
-
-  (window as any).editCategory = async (id: string) => {
-    const cat = categories.find(c => c.id === id);
-    if (!cat) return;
-
-    const newName = prompt('修改分类名称：', cat.name);
-    if (newName === null) return;
-
-    const { error } = await supabase
-      .from('categories')
-      .update({ name: newName })
-      .eq('id', id);
-
-    if (error) {
-      alert('修改失败：' + error.message);
-      return;
-    }
-    loadCategories();
-  };
 
   init();
 </script>

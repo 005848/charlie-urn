@@ -261,6 +261,104 @@ import { CATEGORIES } from '../../../consts';
     contentTextarea.addEventListener('input', updatePreview);
     updatePreview();
 
+    // --- 上传文件到 Supabase Storage ---
+    async function uploadFile(file: File, folder: string = 'blog-images'): Promise<string | null> {
+      const sb = getSupabase();
+      if (!sb) {
+        alert('Supabase 未配置');
+        return null;
+      }
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${fileExt}`;
+
+      const { error, data } = await sb.storage
+        .from('media')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (error) {
+        console.error('上传失败:', error);
+        alert('上传失败: ' + error.message);
+        return null;
+      }
+
+      const { data: urlData } = sb.storage.from('media').getPublicUrl(fileName);
+      return urlData?.publicUrl || null;
+    }
+
+    // --- 加载分类列表 ---
+    async function loadCategories() {
+      const sb = getSupabase();
+      if (!sb) return;
+
+      try {
+        const { data: categories, error } = await sb
+          .from('categories')
+          .select('*')
+          .order('sort_order', { ascending: true });
+
+        if (error) throw error;
+
+        const select = document.getElementById('category') as HTMLSelectElement;
+        if (!select) return;
+
+        // 保留默认选项
+        select.innerHTML = '<option value="">请选择分类</option>';
+
+        categories?.forEach((cat: any) => {
+          const option = document.createElement('option');
+          option.value = cat.slug;
+          option.textContent = cat.name;
+          select.appendChild(option);
+        });
+      } catch (err) {
+        console.error('加载分类失败:', err);
+      }
+    }
+    loadCategories();
+
+    // --- 封面图上传 ---
+    const coverInput = document.getElementById('cover-upload') as HTMLInputElement;
+    const coverPreview = document.getElementById('cover-preview') as HTMLImageElement;
+    const coverUrlInput = document.getElementById('cover_image') as HTMLInputElement;
+
+    coverInput?.addEventListener('change', async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      // 先显示本地预览
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        if (coverPreview && ev.target?.result) {
+          coverPreview.src = ev.target.result as string;
+          coverPreview.style.display = 'block';
+        }
+      };
+      reader.readAsDataURL(file);
+
+      // 上传到服务器
+      const uploadStatus = document.getElementById('upload-status') as HTMLDivElement;
+      if (uploadStatus) {
+        uploadStatus.textContent = '封面图上传中...';
+        uploadStatus.classList.remove('hidden');
+      }
+
+      const publicUrl = await uploadFile(file, 'covers');
+      if (publicUrl && coverUrlInput) {
+        coverUrlInput.value = publicUrl;
+        if (uploadStatus) uploadStatus.textContent = '封面图上传成功 ✓';
+      } else {
+        if (uploadStatus) uploadStatus.textContent = '封面图上传失败';
+      }
+
+      setTimeout(() => {
+        uploadStatus?.classList.add('hidden');
+      }, 2000);
+    });
+
     // --- 媒体上传功能 ---
     const uploadStatus = document.getElementById('upload-status') as HTMLDivElement;
     const uploadProgress = document.getElementById('upload-progress') as HTMLSpanElement;
@@ -363,28 +461,6 @@ import { CATEGORIES } from '../../../consts';
       textarea.focus();
       textarea.setSelectionRange(newPos, newPos);
     });
-
-    // --- 加载分类 ---
-    async function loadCategories() {
-      const sb = getSupabase();
-      if (!sb) return;
-      const { data, error } = await sb
-        .from('categories')
-        .select('*')
-        .order('sort_order', { ascending: true });
-      if (error) return;
-      const categorySelect = document.getElementById('category') as HTMLSelectElement;
-      if (categorySelect) {
-        categorySelect.innerHTML = '';
-        data.forEach((cat: {name: string, slug: string}) => {
-          const opt = document.createElement('option');
-          opt.value = cat.slug;
-          opt.textContent = cat.name;
-          categorySelect.appendChild(opt);
-        });
-      }
-    }
-    loadCategories();
 
     // --- Markdown 工具栏 ---
     const toolbar = document.getElementById('md-toolbar');
@@ -506,20 +582,31 @@ import { CATEGORIES } from '../../../consts';
       const tagsStr = (document.getElementById('tags') as HTMLInputElement).value;
       const tags = tagsStr.split(',').map((t) => t.trim()).filter(Boolean);
       const pub_date = (document.getElementById('pubDate') as HTMLInputElement).value;
+      const cover_image = (document.getElementById('cover_image') as HTMLInputElement).value;
+      const weather = (document.getElementById('weather') as HTMLInputElement).value || null;
+      const mood = (document.getElementById('mood') as HTMLInputElement).value || null;
+      const unlock_date = (document.getElementById('unlock_date') as HTMLInputElement).value || null;
+
+      const postData: any = { title, slug, category, description, content, status, tags, pub_date };
+      if (cover_image) postData.cover_image = cover_image;
+      if (weather) postData.weather = weather;
+      if (mood) postData.mood = mood;
+      if (unlock_date) postData.unlock_date = unlock_date;
 
       try {
         if (postId) {
           // 更新
+          postData.updated_at = new Date().toISOString();
           const { error } = await sb
             .from('blog_posts')
-            .update({ title, slug, category, description, content, status, tags, pub_date, updated_at: new Date().toISOString() })
+            .update(postData)
             .eq('id', postId);
           if (error) throw error;
         } else {
           // 新建
           const { error } = await sb
             .from('blog_posts')
-            .insert({ title, slug, category, description, content, status, tags, pub_date });
+            .insert(postData);
           if (error) throw error;
         }
 
