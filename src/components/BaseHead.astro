@@ -12,20 +12,25 @@ const { title = SITE_TITLE, description = SITE_DESCRIPTION } = Astro.props;
 const fullTitle = title === SITE_TITLE ? title : `${title} — ${SITE_TITLE}`;
 
 // 从服务端环境变量读取 Supabase 配置，注入到 meta 标签中
-// 前端通过读取 meta 标签获取配置（避免硬编码在构建产物中）
-await loadEnv();
+// 硬编码兜底值，确保无环境变量时也能正常构建和运行
+const FALLBACK_URL = 'https://fmjdtehxewybtgokzmob.supabase.co';
+const FALLBACK_ANON_KEY = 'sb_publishable_ann2PFDdRhFc570RXcbpiQ_2vIoUUiS';
+
+try { await loadEnv(); } catch {}
 const supabaseUrl =
 	import.meta.env.Coze_SUPABASE_URL ||
 	import.meta.env.PUBLIC_SUPABASE_URL ||
 	process?.env?.COZE_SUPABASE_URL ||
 	process?.env?.SUPABASE_URL ||
-	'';
+	process?.env?.PUBLIC_SUPABASE_URL ||
+	FALLBACK_URL;
 const supabaseAnonKey =
 	import.meta.env.Coze_SUPABASE_ANON_KEY ||
 	import.meta.env.PUBLIC_SUPABASE_ANON_KEY ||
 	process?.env?.COZE_SUPABASE_ANON_KEY ||
 	process?.env?.SUPABASE_ANON_KEY ||
-	'';
+	process?.env?.PUBLIC_SUPABASE_ANON_KEY ||
+	FALLBACK_ANON_KEY;
 ---
 
 <meta charset="UTF-8" />

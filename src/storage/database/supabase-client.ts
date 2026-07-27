@@ -4,6 +4,10 @@ import { getReportBuffer, createWrappedFetch } from 'coze-coding-dev-sdk';
 
 let envLoaded = false;
 
+// 硬编码兜底配置（部署时无环境变量也能正常构建）
+const FALLBACK_URL = 'https://fmjdtehxewybtgokzmob.supabase.co';
+const FALLBACK_ANON_KEY = 'sb_publishable_ann2PFDdRhFc570RXcbpiQ_2vIoUUiS';
+
 interface SupabaseCredentials {
   url: string;
   anonKey: string;
@@ -71,14 +75,20 @@ except Exception as e:
 function getSupabaseCredentials(): SupabaseCredentials {
   loadEnv();
 
-  const url = process.env.COZE_SUPABASE_URL;
-  const anonKey = process.env.COZE_SUPABASE_ANON_KEY;
+  const url = process.env.COZE_SUPABASE_URL
+    || process.env.SUPABASE_URL
+    || process.env.PUBLIC_SUPABASE_URL
+    || FALLBACK_URL;
+  const anonKey = process.env.COZE_SUPABASE_ANON_KEY
+    || process.env.SUPABASE_ANON_KEY
+    || process.env.PUBLIC_SUPABASE_ANON_KEY
+    || FALLBACK_ANON_KEY;
 
   if (!url) {
-    throw new Error('COZE_SUPABASE_URL is not set');
+    throw new Error('SUPABASE_URL is not set');
   }
   if (!anonKey) {
-    throw new Error('COZE_SUPABASE_ANON_KEY is not set');
+    throw new Error('SUPABASE_ANON_KEY is not set');
   }
 
   return { url, anonKey };
