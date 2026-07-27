@@ -59,6 +59,78 @@ export type Post = {
   updated_at: string;
 };
 
+// ========== 媒体上传 ==========
+
+const MEDIA_BUCKET = 'media';
+
+export type MediaFile = {
+  name: string;
+  url: string;
+  size: number;
+  type: string;
+  created_at: string;
+};
+
+export async function uploadFile(file: File, folder = ''): Promise<{ url: string; name: string }> {
+  const supabase = getSupabase();
+  const timestamp = Date.now();
+  const safeName = `${folder ? folder + '/' : ''}${timestamp}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+
+  const { data, error } = await supabase.storage
+    .from(MEDIA_BUCKET)
+    .upload(safeName, file, {
+      cacheControl: '3600',
+      upsert: false,
+    });
+
+  if (error) throw new Error('上传失败：' + error.message);
+
+  const { data: urlData } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(data.path);
+
+  return { url: urlData.publicUrl, name: data.path };
+}
+
+export async function listMediaFiles(folder = ''): Promise<MediaFile[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.storage.from(MEDIA_BUCKET).list(folder, {
+    limit: 100,
+    offset: 0,
+    sortBy: { column: 'created_at', order: 'desc' },
+  });
+
+  if (error) throw new Error('获取文件列表失败：' + error.message);
+  if (!data) return [];
+
+  return data
+    .filter(f => f.name !== '.emptyFolderPlaceholder')
+    .map(f => {
+      const fullPath = folder ? `${folder}/${f.name}` : f.name;
+      const { data: urlData } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(fullPath);
+      return {
+        name: f.name,
+        url: urlData.publicUrl,
+        size: f.metadata?.size || 0,
+        type: f.metadata?.mimetype || '',
+        created_at: f.created_at || '',
+      };
+    });
+}
+
+export async function deleteMediaFile(filePath: string): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase.storage.from(MEDIA_BUCKET).remove([filePath]);
+  if (error) throw new Error('删除失败：' + error.message);
+}
+
+export function getFileType(fileName: string): 'image' | 'video' | 'audio' | 'other' {
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  if (!ext) return 'other';
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'avif'].includes(ext)) return 'image';
+  if (['mp4', 'webm', 'ogg', 'mov', 'avi'].includes(ext)) return 'video';
+  if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'webm'].includes(ext)) return 'audio';
+  return 'other';
+}
+
 export type Comment = {
   id: number;
   post_id: number | null;
