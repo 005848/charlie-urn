@@ -105,6 +105,9 @@ import { CATEGORIES } from '../../../consts';
                 <span>🎵</span> 插入音频
                 <input type="file" accept="audio/*" class="hidden" id="upload-audio" />
               </label>
+              <button type="button" id="insert-code-btn" class="px-3 py-1.5 text-xs bg-[#f0eeeb] hover:bg-[#e5e2dd] text-[#6b6864] rounded-md transition-colors flex items-center gap-1">
+                <span>💻</span> 插入代码
+              </button>
             </div>
           </div>
           <textarea
@@ -343,6 +346,22 @@ import { CATEGORIES } from '../../../consts';
     (document.getElementById('upload-audio') as HTMLInputElement).addEventListener('change', (e) => {
       handleMediaUpload((e.target as HTMLInputElement).files, 'audio');
       (e.target as HTMLInputElement).value = '';
+    });
+
+    // 插入代码块
+    document.getElementById('insert-code-btn')?.addEventListener('click', () => {
+      const textarea = document.getElementById('content') as HTMLTextAreaElement;
+      const lang = prompt('请输入代码语言（如 javascript、python、html、css、sql 等，留空则无语法高亮）：', 'javascript') || '';
+      const code = prompt('粘贴你的代码：', '') || '';
+      if (!code) return;
+      const codeBlock = `\n\`\`\`${lang}\n${code}\n\`\`\`\n`;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      textarea.value = textarea.value.substring(0, start) + codeBlock + textarea.value.substring(end);
+      textarea.dispatchEvent(new Event('input'));
+      const newPos = start + codeBlock.length;
+      textarea.focus();
+      textarea.setSelectionRange(newPos, newPos);
     });
 
     // --- 加载分类 ---

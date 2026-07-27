@@ -22,7 +22,7 @@ const { title, description } = Astro.props;
         const saved = localStorage.getItem('theme');
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         if (saved === 'dark' || (!saved && prefersDark)) {
-          document.documentElement.classList.add('dark');
+          document.documentElement.setAttribute('data-theme', 'dark');
         }
       })();
     </script>
