@@ -11,7 +11,8 @@ export async function GET() {
     .order('pub_date', { ascending: false })
     .limit(20);
 
-  const items = posts.map(post => `
+  const safePosts = posts || [];
+  const items = safePosts.map(post => `
     <item>
       <title><![CDATA[${post.title}]]></title>
       <link>${SITE_URL}/blog/${post.slug}/</link>
