@@ -1,38 +1,49 @@
 ---
 import Layout from './Layout.astro';
 import FormattedDate from '../components/FormattedDate.astro';
-import { CATEGORIES } from '../consts';
 
 interface Props {
   title: string;
   description: string;
   pubDate: Date;
   updatedDate?: Date;
-  heroImage?: any;
-  category: string;
+  coverImage?: string;
+  category?: string;
   tags?: string[];
+  postId?: string;
+  viewCount?: number;
+  likeCount?: number;
 }
 
-const { title, description, pubDate, updatedDate, category, tags = [] } = Astro.props;
-
-const categoryInfo = CATEGORIES.find(c => c.id === category) || CATEGORIES[0];
+const { title, description, pubDate, updatedDate, coverImage, category, tags = [], postId, viewCount = 0, likeCount = 0 } = Astro.props;
 ---
 
 <Layout title={title} description={description}>
+  <!-- 阅读进度条 -->
+  <div id="reading-progress" class="reading-progress">
+    <div class="progress-bar"></div>
+  </div>
+
   <article class="article-page">
+    {coverImage && (
+      <div class="article-cover">
+        <img src={coverImage} alt={title} fetchpriority="high" />
+        <div class="cover-overlay"></div>
+      </div>
+    )}
+
     <header class="article-header">
       <div class="header-inner">
         <a href="/blog" class="back-link">← 返回目录</a>
 
-        <div class="article-meta-top">
-          <span class="article-category">
-            <span class="cat-icon">{categoryInfo.icon}</span>
-            <span>{categoryInfo.label}</span>
-          </span>
-          <span class="article-date">
-            <FormattedDate date={pubDate} />
-          </span>
-        </div>
+        {category && (
+          <div class="article-meta-top">
+            <span class="article-category">{category}</span>
+            <span class="article-date">
+              <FormattedDate date={pubDate} />
+            </span>
+          </div>
+        )}
 
         <h1 class="article-title">{title}</h1>
 
@@ -45,6 +56,22 @@ const categoryInfo = CATEGORIES.find(c => c.id === category) || CATEGORIES[0];
             ))}
           </div>
         )}
+
+        <div class="article-stats">
+          <span class="stat-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <span id="view-count-display">{viewCount}</span>
+          </span>
+          <span class="stat-item like-button" data-post-id={postId} id="like-button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+            <span id="like-count-display">{likeCount}</span>
+          </span>
+        </div>
       </div>
     </header>
 
@@ -74,16 +101,154 @@ const categoryInfo = CATEGORIES.find(c => c.id === category) || CATEGORIES[0];
   </article>
 </Layout>
 
+<script>
+  // 阅读进度条
+  const progressBar = document.querySelector('.reading-progress .progress-bar') as HTMLElement;
+  if (progressBar) {
+    const updateProgress = () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const progress = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+      progressBar.style.width = `${progress}%`;
+    };
+    window.addEventListener('scroll', updateProgress, { passive: true });
+    updateProgress();
+  }
+
+  // 点赞功能
+  const likeButton = document.getElementById('like-button');
+  const likeCountDisplay = document.getElementById('like-count-display');
+  const postId = likeButton?.getAttribute('data-post-id');
+
+  if (likeButton && postId && likeCountDisplay) {
+    const getVisitorId = () => {
+      let id = localStorage.getItem('charlie_visitor_id');
+      if (!id) {
+        id = 'v_' + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('charlie_visitor_id', id);
+      }
+      return id;
+    };
+
+    const visitorId = getVisitorId();
+    const likedKey = `liked_${postId}`;
+    let isLiked = localStorage.getItem(likedKey) === '1';
+
+    const updateLikeUI = () => {
+      if (isLiked) {
+        likeButton.classList.add('liked');
+      } else {
+        likeButton.classList.remove('liked');
+      }
+    };
+    updateLikeUI();
+
+    likeButton.addEventListener('click', async () => {
+      try {
+        const supabaseUrl = document.querySelector('meta[name="x-supabase-url"]')?.getAttribute('content') || '';
+        const anonKey = document.querySelector('meta[name="x-supabase-anon-key"]')?.getAttribute('content') || '';
+        if (!supabaseUrl || !anonKey) return;
+
+        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+        const supabase = createClient(supabaseUrl, anonKey);
+
+        if (isLiked) {
+          // 取消点赞
+          const { error: delError } = await supabase
+            .from('post_likes')
+            .delete()
+            .eq('post_id', postId)
+            .eq('visitor_id', visitorId);
+          
+          if (!delError) {
+            const { error } = await supabase.rpc('decrement_like_count', { post_id_param: postId });
+            if (!error) {
+              isLiked = false;
+              localStorage.removeItem(likedKey);
+              likeCountDisplay.textContent = String(parseInt(likeCountDisplay.textContent) - 1);
+              updateLikeUI();
+            }
+          }
+        } else {
+          // 点赞
+          const { error: insError } = await supabase
+            .from('post_likes')
+            .insert({ post_id: postId, visitor_id: visitorId });
+          
+          if (!insError) {
+            const { error } = await supabase.rpc('increment_like_count', { post_id_param: postId });
+            if (!error) {
+              isLiked = true;
+              localStorage.setItem(likedKey, '1');
+              likeCountDisplay.textContent = String(parseInt(likeCountDisplay.textContent) + 1);
+              updateLikeUI();
+            }
+          }
+        }
+      } catch(e) {
+        console.error('点赞失败:', e);
+      }
+    });
+  }
+</script>
+
 <style>
 .article-page {
   max-width: 100%;
 }
 
+.reading-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  z-index: 100;
+  background: transparent;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-accent-primary), var(--color-accent-secondary));
+  width: 0%;
+  transition: width 0.1s linear;
+}
+
+.article-cover {
+  position: relative;
+  width: 100%;
+  height: 400px;
+  overflow: hidden;
+}
+
+.article-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cover-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: linear-gradient(transparent, var(--color-bg-primary));
+}
+
 .article-header {
-  padding: 80px 24px 48px;
+  padding: 60px 24px 40px;
   background: linear-gradient(
     180deg,
     var(--color-bg-secondary) 0%,
+    var(--color-bg-primary) 100%
+  );
+}
+
+:global(.dark) .article-header {
+  background: linear-gradient(
+    180deg,
+    var(--color-bg-tertiary) 0%,
     var(--color-bg-primary) 100%
   );
 }
@@ -99,7 +264,7 @@ const categoryInfo = CATEGORIES.find(c => c.id === category) || CATEGORIES[0];
   font-size: 0.85rem;
   color: var(--color-text-tertiary);
   text-decoration: none;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
   transition: color 0.3s var(--ease-smooth);
 }
 
@@ -112,20 +277,14 @@ const categoryInfo = CATEGORIES.find(c => c.id === category) || CATEGORIES[0];
   align-items: center;
   justify-content: center;
   gap: 20px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   font-size: 0.85rem;
   color: var(--color-text-tertiary);
 }
 
 .article-category {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.cat-icon {
   color: var(--color-accent-primary);
-  font-size: 0.9rem;
+  letter-spacing: 0.05em;
 }
 
 .article-date {
@@ -138,7 +297,7 @@ const categoryInfo = CATEGORIES.find(c => c.id === category) || CATEGORIES[0];
   font-weight: 500;
   line-height: 1.4;
   color: var(--color-text-primary);
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   letter-spacing: 0.03em;
 }
 
@@ -147,7 +306,7 @@ const categoryInfo = CATEGORIES.find(c => c.id === category) || CATEGORIES[0];
   line-height: 1.8;
   color: var(--color-text-secondary);
   font-style: italic;
-  margin-bottom: 28px;
+  margin-bottom: 20px;
 }
 
 .article-tags {
@@ -155,6 +314,7 @@ const categoryInfo = CATEGORIES.find(c => c.id === category) || CATEGORIES[0];
   justify-content: center;
   flex-wrap: wrap;
   gap: 8px;
+  margin-bottom: 24px;
 }
 
 .tag-item {
@@ -163,12 +323,46 @@ const categoryInfo = CATEGORIES.find(c => c.id === category) || CATEGORIES[0];
   letter-spacing: 0.03em;
 }
 
+.article-stats {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 24px;
+  font-size: 0.85rem;
+  color: var(--color-text-tertiary);
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.like-button {
+  cursor: pointer;
+  transition: all 0.3s var(--ease-smooth);
+  user-select: none;
+}
+
+.like-button:hover {
+  color: var(--color-accent-primary);
+  transform: scale(1.1);
+}
+
+.like-button.liked {
+  color: var(--color-accent-primary);
+}
+
+.like-button.liked svg {
+  fill: var(--color-accent-primary);
+}
+
 .article-body {
-  padding: 48px 24px;
+  padding: 40px 24px;
 }
 
 .article-footer {
-  padding: 48px 24px 80px;
+  padding: 40px 24px 80px;
 }
 
 .footer-inner {
@@ -179,16 +373,16 @@ const categoryInfo = CATEGORIES.find(c => c.id === category) || CATEGORIES[0];
 
 .footer-divider {
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
   margin-bottom: 32px;
 }
 
 .divider-dot {
-  width: 6px;
-  height: 6px;
-  background-color: var(--color-accent-primary);
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
+  background: var(--color-border);
   position: relative;
 }
 
@@ -197,18 +391,13 @@ const categoryInfo = CATEGORIES.find(c => c.id === category) || CATEGORIES[0];
   content: '';
   position: absolute;
   top: 50%;
-  width: 60px;
+  width: 80px;
   height: 1px;
-  background-color: var(--color-border);
+  background: var(--color-border);
 }
 
-.divider-dot::before {
-  right: 16px;
-}
-
-.divider-dot::after {
-  left: 16px;
-}
+.divider-dot::before { right: 12px; }
+.divider-dot::after { left: 12px; }
 
 .updated-note {
   font-size: 0.8rem;
@@ -217,32 +406,24 @@ const categoryInfo = CATEGORIES.find(c => c.id === category) || CATEGORIES[0];
 }
 
 .footer-nav {
-  margin-top: 16px;
+  margin-top: 24px;
 }
 
 .footer-link {
-  display: inline-block;
-  font-size: 0.9rem;
   color: var(--color-accent-primary);
   text-decoration: none;
-  transition: color 0.3s var(--ease-smooth);
+  font-size: 0.9rem;
+  transition: opacity 0.3s var(--ease-smooth);
 }
 
 .footer-link:hover {
-  color: var(--color-accent-hover);
+  opacity: 0.7;
 }
 
-@media (max-width: 768px) {
-  .article-header {
-    padding: 48px 16px 32px;
-  }
-
-  .article-body {
-    padding: 32px 16px;
-  }
-
-  .article-footer {
-    padding: 32px 16px 60px;
-  }
+@media (max-width: 640px) {
+  .article-cover { height: 250px; }
+  .article-header { padding: 40px 16px 32px; }
+  .article-body { padding: 32px 16px; }
+  .article-footer { padding: 32px 16px 60px; }
 }
 </style>

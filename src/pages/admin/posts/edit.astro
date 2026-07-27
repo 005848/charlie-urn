@@ -36,6 +36,19 @@ import { CATEGORIES } from '../../../consts';
           />
         </div>
 
+        <!-- 封面图 -->
+        <div>
+          <label class="block text-sm text-[#6b6864] mb-2">封面图</label>
+          <div id="cover-image-container" class="hidden mb-3">
+            <img id="cover-image-preview" class="w-full h-48 object-cover rounded-lg border border-[#e5e2dd]" />
+            <button type="button" id="remove-cover" class="mt-2 text-xs text-[#6b6864] hover:text-[#b8977a]">移除封面图</button>
+          </div>
+          <label class="cursor-pointer inline-block px-4 py-2 bg-[#f0eeeb] hover:bg-[#e5e2dd] text-[#6b6864] rounded-md transition-colors text-sm">
+            📷 上传封面图
+            <input type="file" accept="image/*" class="hidden" id="upload-cover" />
+          </label>
+        </div>
+
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label for="category" class="block text-sm text-[#6b6864] mb-2">分类</label>
@@ -43,9 +56,7 @@ import { CATEGORIES } from '../../../consts';
               id="category"
               class="w-full px-4 py-3 bg-white border border-[#e5e2dd] rounded-lg focus:outline-none focus:border-[#b8977a] transition-colors text-[#2c2a28]"
             >
-              {CATEGORIES.map((cat) => (
-                <option value={cat.value}>{cat.label}</option>
-              ))}
+              <option value="">加载中...</option>
             </select>
           </div>
           <div>
@@ -334,6 +345,130 @@ import { CATEGORIES } from '../../../consts';
       (e.target as HTMLInputElement).value = '';
     });
 
+    // --- 加载分类 ---
+    async function loadCategories() {
+      const sb = getSupabase();
+      if (!sb) return;
+      const { data, error } = await sb
+        .from('categories')
+        .select('*')
+        .order('sort_order', { ascending: true });
+      if (error) return;
+      const categorySelect = document.getElementById('category') as HTMLSelectElement;
+      if (categorySelect) {
+        categorySelect.innerHTML = '';
+        data.forEach((cat: {name: string, slug: string}) => {
+          const opt = document.createElement('option');
+          opt.value = cat.slug;
+          opt.textContent = cat.name;
+          categorySelect.appendChild(opt);
+        });
+      }
+    }
+    loadCategories();
+
+    // --- Markdown 工具栏 ---
+    const toolbar = document.getElementById('md-toolbar');
+    const textarea = document.getElementById('content') as HTMLTextAreaElement;
+
+    function insertMarkdown(prefix: string, suffix = '', placeholder = '') {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const selected = textarea.value.substring(start, end) || placeholder;
+      const before = textarea.value.substring(0, start);
+      const after = textarea.value.substring(end, textarea.value.length);
+      textarea.value = before + prefix + selected + suffix + after;
+      textarea.focus();
+      textarea.selectionStart = start + prefix.length;
+      textarea.selectionEnd = start + prefix.length + selected.length;
+    }
+
+    const toolbarBtns: Record<string, () => void> = {
+      'bold': () => insertMarkdown('**', '**', '粗体文字'),
+      'italic': () => insertMarkdown('*', '*', '斜体文字'),
+      'h2': () => insertMarkdown('\n## ', '\n', '二级标题'),
+      'h3': () => insertMarkdown('\n### ', '\n', '三级标题'),
+      'link': () => insertMarkdown('[', '](https://)', '链接文字'),
+      'quote': () => insertMarkdown('\n> ', '\n', '引用内容'),
+      'code': () => insertMarkdown('\n```javascript\n', '\n```\n', '// 代码'),
+      'list': () => insertMarkdown('\n- ', '\n', '列表项'),
+      'hr': () => insertMarkdown('\n\n---\n\n', '', ''),
+    };
+
+    if (toolbar) {
+      toolbar.querySelectorAll('button[data-action]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const action = (btn as HTMLButtonElement).dataset.action;
+          if (action && toolbarBtns[action]) {
+            toolbarBtns[action]();
+            // 触发预览更新
+            textarea.dispatchEvent(new Event('input'));
+          }
+        });
+      });
+    }
+
+    // --- 草稿自动保存 ---
+    const DRAFT_KEY = 'charlie_post_draft';
+    let autoSaveTimer: number | null = null;
+    const draftStatus = document.getElementById('draft-status');
+
+    function saveDraft() {
+      const title = (document.getElementById('title') as HTMLInputElement).value;
+      const content = textarea.value;
+      if (!title && !content) return;
+      const draft = {
+        title,
+        slug: (document.getElementById('slug') as HTMLInputElement).value,
+        category: (document.getElementById('category') as HTMLSelectElement).value,
+        description: (document.getElementById('description') as HTMLTextAreaElement).value,
+        content,
+        tags: (document.getElementById('tags') as HTMLInputElement).value,
+        savedAt: new Date().toISOString(),
+      };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      if (draftStatus) {
+        draftStatus.textContent = '草稿已自动保存 · ' + new Date().toLocaleTimeString('zh-CN');
+        setTimeout(() => { if (draftStatus) draftStatus.textContent = ''; }, 3000);
+      }
+    }
+
+    function restoreDraft() {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (!saved) return;
+      if (postId) return; // 编辑模式不恢复草稿
+      try {
+        const draft = JSON.parse(saved);
+        if (confirm('发现未完成的草稿，是否恢复？')) {
+          (document.getElementById('title') as HTMLInputElement).value = draft.title || '';
+          (document.getElementById('slug') as HTMLInputElement).value = draft.slug || '';
+          (document.getElementById('description') as HTMLTextAreaElement).value = draft.description || '';
+          textarea.value = draft.content || '';
+          (document.getElementById('tags') as HTMLInputElement).value = draft.tags || '';
+          if (draft.category) {
+            const catSelect = document.getElementById('category') as HTMLSelectElement;
+            setTimeout(() => { catSelect.value = draft.category; }, 300);
+          }
+          textarea.dispatchEvent(new Event('input'));
+        }
+      } catch(e) { console.warn('草稿恢复失败', e); }
+    }
+
+    textarea.addEventListener('input', () => {
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+      autoSaveTimer = window.setTimeout(saveDraft, 3000);
+    });
+    document.getElementById('title')?.addEventListener('input', () => {
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+      autoSaveTimer = window.setTimeout(saveDraft, 3000);
+    });
+    restoreDraft();
+
+    // 保存成功后清除草稿
+    function clearDraft() {
+      localStorage.removeItem(DRAFT_KEY);
+    }
+
     // --- 表单提交 ---
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -370,6 +505,7 @@ import { CATEGORIES } from '../../../consts';
         }
 
         alert('保存成功');
+        clearDraft();
         window.location.href = '/admin/posts';
       } catch (err) {
         alert('保存失败：' + (err as any).message);

@@ -16,6 +16,16 @@ const { title, description } = Astro.props;
 <html lang="zh-CN">
   <head>
     <BaseHead title={title} description={description} />
+    <script is:inline>
+      // 防止暗色模式闪烁
+      (function() {
+        const saved = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (saved === 'dark' || (!saved && prefersDark)) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <Header />

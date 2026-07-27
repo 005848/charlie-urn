@@ -1,0 +1,299 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="分类管理 - Charlie的电子骨灰盒" description="文章分类管理">
+  <div class="admin-page">
+    <div class="admin-container">
+      <div class="admin-header">
+        <a href="/admin" class="back-link">← 返回后台</a>
+        <h1>分类管理</h1>
+        <p class="admin-subtitle">管理文章分类，支持新增、编辑、删除</p>
+      </div>
+
+      <div class="admin-card">
+        <div class="form-row">
+          <input type="text" id="catName" placeholder="分类名称" style="flex:1" />
+          <input type="text" id="catSlug" placeholder="分类别名 (英文)" style="width:150px" />
+          <input type="text" id="catDesc" placeholder="描述 (可选)" style="flex:1" />
+          <button type="button" id="addCatBtn" class="btn-primary">添加分类</button>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <h3 style="margin-bottom:16px">所有分类</h3>
+        <div id="categoryList" class="category-list">
+          <p class="text-muted">加载中...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import { getSupabase } from '../../lib/supabase/client';
+
+  const supabase = getSupabase();
+  let categories: any[] = [];
+
+  async function checkAdminAuth() {
+    const { data } = await supabase.auth.getSession();
+    return !!data.session;
+  }
+
+  async function init() {
+    const isAuthed = await checkAdminAuth();
+    if (!isAuthed) {
+      window.location.href = '/admin/login';
+      return;
+    }
+    loadCategories();
+  }
+
+  async function loadCategories() {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .order('sort_order', { ascending: true });
+
+    if (error) {
+      document.getElementById('categoryList')!.innerHTML =
+        `<p class="error-text">加载失败：${error.message}</p>`;
+      return;
+    }
+
+    categories = data || [];
+    renderCategories();
+  }
+
+  function renderCategories() {
+    const list = document.getElementById('categoryList')!;
+    if (categories.length === 0) {
+      list.innerHTML = '<p class="text-muted">暂无分类，添加一个吧～</p>';
+      return;
+    }
+
+    list.innerHTML = categories.map((cat: any) => `
+      <div class="category-item" data-id="${cat.id}">
+        <div class="cat-info">
+          <span class="cat-name">${cat.name}</span>
+          <span class="cat-slug">${cat.slug}</span>
+          ${cat.description ? `<span class="cat-desc">${cat.description}</span>` : ''}
+        </div>
+        <div class="cat-actions">
+          <button class="btn-small" onclick="editCategory('${cat.id}')">编辑</button>
+          <button class="btn-danger btn-small" onclick="deleteCategory('${cat.id}')">删除</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('addCatBtn')?.addEventListener('click', async () => {
+    const name = (document.getElementById('catName') as HTMLInputElement).value.trim();
+    const slug = (document.getElementById('catSlug') as HTMLInputElement).value.trim();
+    const description = (document.getElementById('catDesc') as HTMLInputElement).value.trim();
+
+    if (!name || !slug) {
+      alert('请填写分类名称和别名');
+      return;
+    }
+
+    const { error } = await supabase.from('categories').insert([
+      { name, slug, description: description || null }
+    ]);
+
+    if (error) {
+      alert('添加失败：' + error.message);
+      return;
+    }
+
+    (document.getElementById('catName') as HTMLInputElement).value = '';
+    (document.getElementById('catSlug') as HTMLInputElement).value = '';
+    (document.getElementById('catDesc') as HTMLInputElement).value = '';
+    loadCategories();
+  });
+
+  (window as any).deleteCategory = async (id: string) => {
+    if (!confirm('确定删除这个分类吗？')) return;
+    const { error } = await supabase.from('categories').delete().eq('id', id);
+    if (error) {
+      alert('删除失败：' + error.message);
+      return;
+    }
+    loadCategories();
+  };
+
+  (window as any).editCategory = async (id: string) => {
+    const cat = categories.find(c => c.id === id);
+    if (!cat) return;
+
+    const newName = prompt('修改分类名称：', cat.name);
+    if (newName === null) return;
+
+    const { error } = await supabase
+      .from('categories')
+      .update({ name: newName })
+      .eq('id', id);
+
+    if (error) {
+      alert('修改失败：' + error.message);
+      return;
+    }
+    loadCategories();
+  };
+
+  init();
+</script>
+
+<style>
+  .admin-page {
+    min-height: 70vh;
+    padding: 48px 20px;
+  }
+  .admin-container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  .admin-header {
+    margin-bottom: 32px;
+    text-align: center;
+  }
+  .admin-header h1 {
+    font-family: "Noto Serif SC", "Source Han Serif SC", serif;
+    font-size: 1.8rem;
+    font-weight: 500;
+    color: var(--color-text);
+    margin: 12px 0 8px;
+  }
+  .admin-subtitle {
+    color: var(--color-text-secondary);
+    font-size: 0.9rem;
+  }
+  .back-link {
+    color: var(--color-text-tertiary);
+    text-decoration: none;
+    font-size: 0.85rem;
+    display: inline-block;
+    margin-bottom: 8px;
+    transition: color 0.3s ease;
+  }
+  .back-link:hover {
+    color: var(--color-accent);
+  }
+  .admin-card {
+    background: #fff;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  .form-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  input[type="text"] {
+    padding: 10px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    background: var(--color-bg-primary);
+    color: var(--color-text);
+    transition: border-color 0.3s ease;
+    font-family: inherit;
+  }
+  input[type="text"]:focus {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+  .btn-primary {
+    padding: 10px 20px;
+    background: var(--color-accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    font-family: inherit;
+  }
+  .btn-primary:hover {
+    background: var(--color-accent-dark);
+  }
+  .btn-small {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: inherit;
+  }
+  .btn-small:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+  .btn-danger {
+    color: #c95858;
+    border-color: #e5c5c5;
+  }
+  .btn-danger:hover {
+    background: #fdf2f2;
+    border-color: #c95858;
+    color: #c95858;
+  }
+  .category-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .category-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background: var(--color-bg-secondary);
+    border-radius: 6px;
+    border: 1px solid var(--color-border);
+  }
+  .cat-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .cat-name {
+    font-weight: 500;
+    color: var(--color-text);
+  }
+  .cat-slug {
+    font-family: "SF Mono", "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.8rem;
+    color: var(--color-text-tertiary);
+    background: var(--color-bg-tertiary);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .cat-desc {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+  }
+  .cat-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .text-muted {
+    color: var(--color-text-tertiary);
+    text-align: center;
+    padding: 24px;
+    font-size: 0.9rem;
+  }
+  .error-text {
+    color: #c95858;
+    text-align: center;
+    padding: 24px;
+  }
+</style>

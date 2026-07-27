@@ -2,6 +2,24 @@
 import BlogPost from '../../layouts/BlogPost.astro';
 import { getSupabaseClient } from '@storage/database/supabase-client';
 import { marked } from 'marked';
+import hljs from 'highlight.js';
+
+// 配置 marked 代码高亮
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+  highlight: function(code: string, lang: string) {
+    try {
+      if (lang && hljs.getLanguage(lang)) {
+        return hljs.highlight(code, { language: lang }).value;
+      }
+      return hljs.highlightAuto(code).value;
+    } catch {
+      return code;
+    }
+  }
+});
+
 // 构建时从数据库读取所有已发布文章，生成静态页面
 export async function getStaticPaths() {
   try {
@@ -32,10 +50,22 @@ const { post } = Astro.props;
 const htmlContent = marked.parse(post?.content || '', {
   breaks: true,
   gfm: true,
-});
+}) as string;
 
 const pubDate = post?.pub_date ? new Date(post.pub_date) : new Date();
 const updatedDate = post?.updated_at ? new Date(post.updated_at) : undefined;
+
+// 获取分类名
+let categoryName = post?.category || 'essay';
+try {
+  const supabase = getSupabaseClient();
+  const { data: catData } = await supabase
+    .from('categories')
+    .select('name')
+    .eq('slug', post?.category)
+    .single();
+  if (catData?.name) categoryName = catData.name;
+} catch {}
 ---
 
 <BlogPost
@@ -43,15 +73,19 @@ const updatedDate = post?.updated_at ? new Date(post.updated_at) : undefined;
   description={post?.description || ''}
   pubDate={pubDate}
   updatedDate={updatedDate}
-  heroImage={undefined}
-  category={post?.category || 'essay'}
+  coverImage={post?.cover_image}
+  category={categoryName}
   tags={post?.tags || []}
+  postId={post?.id}
+  viewCount={post?.view_count || 0}
+  likeCount={post?.like_count || 0}
 >
   <Fragment set:html={htmlContent} />
 </BlogPost>
 
 <!-- 用于前端获取当前文章 slug（浏览量统计用） -->
 <script is:inline>
+  window.__POST_ID__ = "{post?.id || ''}";
   window.__POST_SLUG__ = "{post?.slug || ''}";
 </script>
 
@@ -59,17 +93,16 @@ const updatedDate = post?.updated_at ? new Date(post.updated_at) : undefined;
   import { createClient } from '@supabase/supabase-js';
 
   // 页面加载后，前端异步增加浏览量
+  const postId = (window as any).__POST_ID__;
   const slug = (window as any).__POST_SLUG__;
-  if (slug && !sessionStorage.getItem(`viewed_${slug}`)) {
+
+  if (postId && !sessionStorage.getItem(`viewed_${slug}`)) {
     const url = document.querySelector<HTMLMetaElement>('meta[name="x-supabase-url"]')?.content || '';
     const anonKey = document.querySelector<HTMLMetaElement>('meta[name="x-supabase-anon-key"]')?.content || '';
     if (url && anonKey) {
       try {
         const sb = createClient(url, anonKey);
-        // 直接用 update 增加浏览量，不依赖 rpc 函数
-        sb.from('blog_posts').update({ view_count: (window as any).__TEMP_VIEW__ || 0 }).eq('slug', slug).catch(() => {});
-        // 简化：调用 rpc（如果函数存在），失败就静默
-        sb.rpc('increment_views', { post_slug: slug }).catch(() => {});
+        sb.rpc('increment_view_count', { post_slug: slug }).catch(() => {});
         sessionStorage.setItem(`viewed_${slug}`, '1');
       } catch {}
     }
