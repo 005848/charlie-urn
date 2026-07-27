@@ -1,63 +1,163 @@
-# Astro Starter Kit: Blog
+# Charlie 的电子骨灰盒
 
-```sh
-pnpm create astro@latest -- --template blog
+> 一个存放记忆与思念的数字空间。在这里，时光永不褪色。
+
+---
+
+## 关于这个项目
+
+"Charlie 的电子骨灰盒"是一个以**个人纪念 / 数字保存**为主题的个人博客。
+
+在信息飞速流转的时代，我们需要一个安静的角落——
+不是为了被多少人看到，而是为了不被自己遗忘。
+
+这里没有热点，没有流量，没有算法推荐。
+只有一些文字、几张照片、几首歌，和很多很多的想念。
+
+就像一本摊开的旧相册，灰尘在阳光里慢慢浮动。
+你可以随时进来，坐一会儿。
+
+---
+
+## 功能特性
+
+### 📝 内容创作
+- **Markdown 编辑器** — 实时预览，支持图片/视频/音频上传
+- **Markdown 快捷工具栏** — 加粗、标题、引用、代码、列表等一键插入
+- **草稿自动保存** — 每 30 秒自动保存到本地，防止意外丢失
+- **文章封面图** — 每篇文章可设置封面
+- **天气 & 心情** — 记录写下这篇文字时的天气和心情
+- **分类管理** — 自定义文章分类，灵活组织内容
+- **标签系统** — 多标签，更精细的内容归类
+- **时间胶囊** — 可设置文章解锁时间，未到时间不可见
+
+### 🎨 阅读体验
+- **情感化排版** — 衬线标题 + 宽行高 + 首字下沉，像读一本书
+- **打字机入场** — 文章首段文字缓缓出现，营造仪式感
+- **阅读进度条** — 顶部细进度条，随时知道读了多少
+- **代码高亮** — 支持多种编程语言，暗色主题适配
+- **暗色模式** — 一键切换深/浅色，阅读不费眼
+- **响应式设计** — 手机、平板、桌面都适配
+- **随机回忆** — 点击随机跳转到一篇文章，像翻旧相册
+
+### 📅 纪念功能
+- **纪念日历** — 记录重要的日子（生日、纪念日、忌日等）
+- **今日提示** — 首页显示最近的纪念日
+- **时光轴视图** — 按时间线浏览所有文章
+
+### 💬 互动功能
+- **留言板** — 访客可以留下想说的话
+- **留言墙视图** — 便利贴风格的留言展示
+- **留言审核** — 新留言需管理员审核后显示
+- **文章点赞** — 喜欢的文章可以点个赞
+
+### 📦 其他
+- **媒体库** — 统一管理上传的图片/视频/音频
+- **数据备份** — 一键导出所有文章和留言
+- **RSS 订阅** — 支持 RSS 2.0 订阅
+- **独立后台** — 完整的管理后台，无需服务器
+
+---
+
+## 技术栈
+
+| 类别 | 技术 |
+|------|------|
+| 框架 | Astro 7（静态站点生成） |
+| 样式 | Tailwind CSS 4 + 自定义全局样式 |
+| 数据库 | Supabase (PostgreSQL) |
+| 认证 | Supabase Auth（邮箱密码） |
+| 存储 | Supabase Storage |
+| 代码高亮 | highlight.js |
+| 字体 | Noto Sans SC / Noto Serif SC / Inter |
+
+---
+
+## 部署
+
+### 支持的平台
+- Cloudflare Pages ✅ 推荐
+- Vercel ✅
+- Netlify ✅
+- 任何支持静态站点托管的平台 ✅
+
+### 环境变量
+
+构建时需要配置以下环境变量：
+
+| 变量名 | 说明 |
+|--------|------|
+| `PUBLIC_SUPABASE_URL` | Supabase 项目 URL |
+| `PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key（公开） |
+| `SUPABASE_URL` | 同上（构建时用） |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service_role key（构建时用） |
+
+### 部署步骤
+
+1. Fork / 导入本项目到 Git 仓库
+2. 在 Supabase 创建项目
+3. 执行建表 SQL（见 `DEPLOY.md`）
+4. 在托管平台配置环境变量
+5. 构建命令：`pnpm install && pnpm run build`
+6. 输出目录：`dist`
+
+详细部署说明见 [DEPLOY.md](./DEPLOY.md)。
+
+---
+
+## 本地开发
+
+```bash
+# 安装依赖
+pnpm install
+
+# 启动开发服务器
+pnpm run dev
+
+# 构建生产版本
+pnpm run build
+
+# 预览构建结果
+pnpm run preview
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+---
 
-Features:
+## 目录结构
 
-- ✅ Minimal styling (make it your own!)
-- ✅ 100/100 Lighthouse performance
-- ✅ SEO-friendly with canonical URLs and Open Graph data
-- ✅ Sitemap support
-- ✅ RSS Feed support
-- ✅ Markdown & MDX support
-
-## 🚀 Project Structure
-
-Inside of your Astro project, you'll see the following folders and files:
-
-```text
-├── public/
-├── src/
-│   ├── assets/
-│   ├── components/
-│   ├── content/
-│   ├── layouts/
-│   └── pages/
-├── astro.config.mjs
-├── README.md
-├── package.json
-└── tsconfig.json
+```
+src/
+├── components/          # 可复用组件
+├── content/             # 本地 Markdown 文章（可选）
+├── layouts/             # 布局模板
+├── lib/supabase/        # 前端 Supabase 客户端
+├── pages/               # 页面
+│   ├── index.astro      # 首页
+│   ├── about.astro      # 关于页
+│   ├── rss.xml.ts       # RSS 订阅
+│   ├── blog/            # 文章列表 & 详情
+│   └── admin/           # 管理后台
+├── styles/              # 全局样式
+└── storage/database/    # 服务端数据库工具
 ```
 
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
+---
 
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
+## 关于"电子骨灰盒"
 
-The `src/content/` directory contains "collections" of related Markdown and MDX documents. Use `getCollection()` to retrieve posts from `src/content/blog/`, and type-check your frontmatter using an optional schema. See [Astro's Content Collections docs](https://docs.astro.build/en/guides/content-collections/) to learn more.
+这个名字听起来有点沉重，其实不是。
 
-Any static assets, like images, can be placed in the `public/` directory.
+骨灰盒是存放逝者骨灰的容器，而"电子骨灰盒"存放的是记忆——
+那些不想忘记的人、不想丢掉的时光、不敢轻易触碰的柔软。
 
-## 🧞 Commands
+它不悲伤，它很安静。
+像一间被阳光斜照的空房间，桌上摊着一本旧相册。
+你随时可以进来，翻一翻，坐一坐。
 
-All commands are run from the root of the project, from a terminal:
+如果这些文字能让你想起某个人、某段时光——
+那就是这个地方存在的意义。
 
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `pnpm install`             | Installs dependencies                            |
-| `pnpm dev`             | Starts local dev server at `localhost:4321`      |
-| `pnpm build`           | Build your production site to `./dist/`          |
-| `pnpm preview`         | Preview your build locally, before deploying     |
-| `pnpm astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `pnpm astro -- --help` | Get help using the Astro CLI                     |
+---
 
-## 👀 Want to learn more?
-
-Check out [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
-
-## Credit
-
-This theme is based off of the lovely [Bear Blog](https://github.com/HermanMartinus/bearblog/).
+> 记忆是一座沙城，你以为坚不可摧，可风一吹，就少了一块。
+> 所以才要把它们写下来啊。
