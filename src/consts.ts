@@ -2,6 +2,7 @@
 
 export const SITE_TITLE = "Charlie的电子骨灰盒";
 export const SITE_DESCRIPTION = "一个存放记忆与思念的数字空间，在这里，时光永不褪色。";
+export const SITE_URL = "https://charlie-urn.pages.dev";
 export const SITE_AUTHOR = "Charlie";
 export const SITE_TAGLINE = "记忆不灭，思念长存";
 

@@ -1,0 +1,158 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="数据备份 - 管理后台">
+  <div class="min-h-screen bg-[#faf9f7] pt-24 pb-16 px-6">
+    <div class="max-w-2xl mx-auto">
+      <div class="mb-8">
+        <a href="/admin" class="text-[#6b6864] text-sm hover:text-[#b8977a] transition-colors">← 返回管理后台</a>
+        <h1 class="text-2xl font-serif mt-4 text-[#2c2a28]">数据备份</h1>
+        <p class="text-[#6b6864] text-sm mt-2">导出所有文章、评论等数据，定期备份防止丢失</p>
+      </div>
+
+      <div class="bg-white border border-[#e5e2dd] rounded-lg p-6 space-y-6">
+        <div>
+          <h3 class="text-base font-medium text-[#2c2a28] mb-2">导出全部数据</h3>
+          <p class="text-[#6b6864] text-sm mb-4">导出为 JSON 格式，包含文章、评论、分类、标签、纪念日</p>
+          <button id="exportAll" class="px-5 py-2.5 bg-[#b8977a] text-white text-sm rounded-md hover:bg-[#8c7159] transition-colors">
+            导出全部数据
+          </button>
+        </div>
+
+        <div class="border-t border-[#e5e2dd] pt-6">
+          <h3 class="text-base font-medium text-[#2c2a28] mb-2">导出文章 (Markdown)</h3>
+          <p class="text-[#6b6864] text-sm mb-4">打包下载所有文章的 Markdown 源文件</p>
+          <button id="exportMarkdown" class="px-5 py-2.5 border border-[#e5e2dd] text-[#2c2a28] text-sm rounded-md hover:bg-[#f0eeeb] transition-colors">
+            导出 Markdown 文件
+          </button>
+        </div>
+
+        <div class="border-t border-[#e5e2dd] pt-6">
+          <h3 class="text-base font-medium text-[#2c2a28] mb-2">统计信息</h3>
+          <div id="statsInfo" class="text-[#6b6864] text-sm space-y-1">
+            加载中...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import { getSupabase } from '../../lib/supabase/client';
+
+  const sb = getSupabase();
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) {
+    window.location.href = '/admin/login';
+  }
+
+  // 加载统计信息
+  async function loadStats() {
+    const statsEl = document.getElementById('statsInfo');
+    try {
+      const { count: postsCount } = await sb.from('blog_posts').select('*', { count: 'exact', head: true });
+      const { count: commentsCount } = await sb.from('guestbook_comments').select('*', { count: 'exact', head: true });
+      const { count: catsCount } = await sb.from('categories').select('*', { count: 'exact', head: true });
+      const { count: memorialsCount } = await sb.from('memorial_dates').select('*', { count: 'exact', head: true });
+
+      statsEl.innerHTML = `
+        <p>文章总数：<span class="text-[#2c2a28] font-medium">${postsCount || 0} 篇</span></p>
+        <p>评论总数：<span class="text-[#2c2a28] font-medium">${commentsCount || 0} 条</span></p>
+        <p>分类数量：<span class="text-[#2c2a28] font-medium">${catsCount || 0} 个</span></p>
+        <p>纪念日数：<span class="text-[#2c2a28] font-medium">${memorialsCount || 0} 个</span></p>
+      `;
+    } catch(e) {
+      statsEl.textContent = '加载失败';
+    }
+  }
+
+  // 导出全部数据
+  document.getElementById('exportAll').addEventListener('click', async () => {
+    const btn = document.getElementById('exportAll');
+    btn.textContent = '导出中...';
+    btn.disabled = true;
+
+    try {
+      const { data: posts } = await sb.from('blog_posts').select('*').order('created_at', { ascending: false });
+      const { data: comments } = await sb.from('guestbook_comments').select('*').order('created_at', { ascending: false });
+      const { data: categories } = await sb.from('categories').select('*').order('sort_order');
+      const { data: tags } = await sb.from('tags').select('*').order('name');
+      const { data: memorialDates } = await sb.from('memorial_dates').select('*').order('date');
+
+      const exportData = {
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        posts,
+        comments,
+        categories,
+        tags,
+        memorial_dates: memorialDates
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `charlie-urn-backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      btn.textContent = '导出成功！';
+      setTimeout(() => btn.textContent = '导出全部数据', 2000);
+    } catch(e) {
+      alert('导出失败：' + e.message);
+      btn.textContent = '导出全部数据';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // 导出 Markdown
+  document.getElementById('exportMarkdown').addEventListener('click', async () => {
+    const btn = document.getElementById('exportMarkdown');
+    btn.textContent = '导出中...';
+    btn.disabled = true;
+
+    try {
+      const { data: posts } = await sb.from('blog_posts').select('*').order('created_at', { ascending: false });
+
+      // 简单的 zip 模拟：直接打包为单个 txt，每篇文章一个文件内容
+      let content = '# Charlie的电子骨灰盒 - 文章导出\n';
+      content += `导出时间：${new Date().toLocaleString('zh-CN')}\n\n`;
+      content += `文章数量：${posts?.length || 0}\n`;
+      content += '='.repeat(60) + '\n\n';
+
+      posts.forEach((post, i) => {
+        content += `\n\n<!-- 第 ${i + 1} 篇：${post.title} -->\n`;
+        content += '='.repeat(60) + '\n\n';
+        content += `slug: ${post.slug}\n`;
+        content += `title: ${post.title}\n`;
+        content += `description: ${post.description || ''}\n`;
+        content += `category: ${post.category || 'essay'}\n`;
+        content += `date: ${post.pub_date || ''}\n`;
+        content += `tags: ${Array.isArray(post.tags) ? post.tags.join(', ') : ''}\n\n`;
+        content += `\n${post.content}\n\n`;
+      });
+
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `posts-${new Date().toISOString().split('T')[0]}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      btn.textContent = '导出成功！';
+      setTimeout(() => btn.textContent = '导出 Markdown 文件', 2000);
+    } catch(e) {
+      alert('导出失败：' + e.message);
+      btn.textContent = '导出 Markdown 文件';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  loadStats();
+</script>

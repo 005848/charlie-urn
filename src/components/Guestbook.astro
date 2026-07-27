@@ -61,6 +61,15 @@
       </div>
     </form>
 
+    <!-- 视图切换 -->
+    <div class="flex items-center justify-between mb-6">
+      <h3 class="text-lg font-medium text-[#2c2a28] dark:text-[#e5e2dd]">留言</h3>
+      <div class="flex gap-1 bg-[#f0eeeb] dark:bg-[#2a2826] rounded-md p-1">
+        <button id="view-list-btn" class="px-3 py-1 text-xs rounded transition-all duration-300 bg-white dark:bg-[#3a3836] text-[#2c2a28] dark:text-[#faf9f7] shadow-sm">列表</button>
+        <button id="view-wall-btn" class="px-3 py-1 text-xs rounded transition-all duration-300 text-[#6b6864] dark:text-[#9a9690] hover:text-[#2c2a28] dark:hover:text-[#e5e2dd]">留言墙</button>
+      </div>
+    </div>
+
     <!-- 留言列表 -->
     <div id="guestbook-list" class="space-y-6">
       <p class="text-center text-[#9a9690] text-sm py-8">加载中...</p>
@@ -226,4 +235,24 @@
 
   // 初始加载
   loadComments();
+
+  // 视图切换
+  const listBtn = document.getElementById('view-list-btn');
+  const wallBtn = document.getElementById('view-wall-btn');
+  const listContainer = document.getElementById('guestbook-list');
+
+  function setView(view) {
+    if (view === 'wall') {
+      listContainer.className = 'guestbook-wall';
+      wallBtn.className = 'px-3 py-1 text-xs rounded transition-all duration-300 bg-white dark:bg-[#3a3836] text-[#2c2a28] dark:text-[#faf9f7] shadow-sm';
+      listBtn.className = 'px-3 py-1 text-xs rounded transition-all duration-300 text-[#6b6864] dark:text-[#9a9690] hover:text-[#2c2a28] dark:hover:text-[#e5e2dd]';
+    } else {
+      listContainer.className = 'space-y-6';
+      listBtn.className = 'px-3 py-1 text-xs rounded transition-all duration-300 bg-white dark:bg-[#3a3836] text-[#2c2a28] dark:text-[#faf9f7] shadow-sm';
+      wallBtn.className = 'px-3 py-1 text-xs rounded transition-all duration-300 text-[#6b6864] dark:text-[#9a9690] hover:text-[#2c2a28] dark:hover:text-[#e5e2dd]';
+    }
+  }
+
+  listBtn?.addEventListener('click', () => setView('list'));
+  wallBtn?.addEventListener('click', () => setView('wall'));
 </script>

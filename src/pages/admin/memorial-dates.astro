@@ -1,0 +1,339 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+<Layout title="纪念日管理 - 后台" description="管理重要的纪念日">
+  <div class="admin-wrapper">
+    <div class="admin-header">
+      <a href="/admin" class="back-link">← 返回后台</a>
+      <h1>纪念日管理</h1>
+      <a href="#" id="addDateBtn" class="btn-primary">新增纪念日</a>
+    </div>
+
+    <div id="datesContainer" class="dates-list">
+      <div class="loading">加载中...</div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import { getSupabase } from '../../lib/supabase/client';
+
+  const sb = getSupabase();
+  (async () => {
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) {
+      window.location.href = '/admin/login';
+    }
+  })();
+
+  const container = document.getElementById('datesContainer');
+  const addBtn = document.getElementById('addDateBtn');
+
+  type DateItem = {
+    id: string;
+    title: string;
+    date: string;
+    type: string;
+    description: string;
+    sort_order: number;
+  };
+
+  async function loadDates() {
+    const { data, error } = await sb
+      .from('memorial_dates')
+      .select('*')
+      .order('sort_order', { ascending: true });
+
+    if (error) {
+      container.innerHTML = `<div class="error">加载失败: ${error.message}</div>`;
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      container.innerHTML = `<div class="empty-state">还没有纪念日，点右上角新增一个吧</div>`;
+      return;
+    }
+
+    container.innerHTML = data.map((item: DateItem) => `
+      <div class="date-card">
+        <div class="date-main">
+          <span class="date-type type-${item.type}">${getTypeLabel(item.type)}</span>
+          <h3 class="date-title">${item.title}</h3>
+          <div class="date-value">${formatDate(item.date)}</div>
+          ${item.description ? `<p class="date-desc">${item.description}</p>` : ''}
+        </div>
+        <div class="date-actions">
+          <button class="btn-edit" data-id="${item.id}">编辑</button>
+          <button class="btn-delete" data-id="${item.id}">删除</button>
+        </div>
+      </div>
+    `).join('');
+
+    // 绑定事件
+    container.querySelectorAll('.btn-edit').forEach((btn: any) => {
+      btn.addEventListener('click', () => openEditModal(btn.dataset.id, data?.find((d: DateItem) => d.id === btn.dataset.id)));
+    });
+    container.querySelectorAll('.btn-delete').forEach((btn: any) => {
+      btn.addEventListener('click', () => deleteDate(btn.dataset.id));
+    });
+  }
+
+  function getTypeLabel(type: string): string {
+    const map: Record<string, string> = {
+      birthday: '🎂 生日',
+      anniversary: '💕 纪念日',
+      memorial: '🕯️ 忌日',
+      other: '📅 其他'
+    };
+    return map[type] || type;
+  }
+
+  function formatDate(dateStr: string): string {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const thisYear = new Date(now.getFullYear(), d.getMonth(), d.getDate());
+    const daysUntil = Math.ceil((thisYear.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const daysText = daysUntil > 0 ? `还有 ${daysUntil} 天` : daysUntil === 0 ? '就是今天！' : `已过 ${Math.abs(daysUntil)} 天`;
+    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（今年${daysText}）`;
+  }
+
+  function openEditModal(id?: string, item?: DateItem) {
+    const title = id ? '编辑纪念日' : '新增纪念日';
+    const data = item || { title: '', date: '', type: 'anniversary', description: '', sort_order: 0 };
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <h3>${title}</h3>
+        <div class="form-group">
+          <label>标题</label>
+          <input type="text" id="md-title" value="${data.title}" placeholder="例如：出生纪念日">
+        </div>
+        <div class="form-group">
+          <label>日期</label>
+          <input type="date" id="md-date" value="${data.date?.split('T')[0] || ''}">
+        </div>
+        <div class="form-group">
+          <label>类型</label>
+          <select id="md-type">
+            <option value="birthday" ${data.type === 'birthday' ? 'selected' : ''}>生日</option>
+            <option value="anniversary" ${data.type === 'anniversary' ? 'selected' : ''}>纪念日</option>
+            <option value="memorial" ${data.type === 'memorial' ? 'selected' : ''}>忌日</option>
+            <option value="other" ${data.type === 'other' ? 'selected' : ''}>其他</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>描述（可选）</label>
+          <textarea id="md-desc" rows="2" placeholder="简短描述">${data.description || ''}</textarea>
+        </div>
+        <div class="form-group">
+          <label>排序</label>
+          <input type="number" id="md-order" value="${data.sort_order || 0}" min="0">
+        </div>
+        <div class="modal-actions">
+          <button class="btn-cancel" id="md-cancel">取消</button>
+          <button class="btn-primary" id="md-save">保存</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.querySelector('#md-cancel')?.addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+
+    modal.querySelector('#md-save')?.addEventListener('click', async () => {
+      const title = (modal.querySelector('#md-title') as HTMLInputElement).value.trim();
+      const date = (modal.querySelector('#md-date') as HTMLInputElement).value;
+      const type = (modal.querySelector('#md-type') as HTMLSelectElement).value;
+      const description = (modal.querySelector('#md-desc') as HTMLTextAreaElement).value.trim();
+      const sort_order = parseInt((modal.querySelector('#md-order') as HTMLInputElement).value) || 0;
+
+      if (!title || !date) {
+        alert('请填写标题和日期');
+        return;
+      }
+
+      const saveBtn = modal.querySelector('#md-save') as HTMLButtonElement;
+      saveBtn.disabled = true;
+      saveBtn.textContent = '保存中...';
+
+      if (id) {
+        await sb.from('memorial_dates').update({ title, date, type, description, sort_order }).eq('id', id);
+      } else {
+        await sb.from('memorial_dates').insert({ title, date, type, description, sort_order });
+      }
+
+      modal.remove();
+      loadDates();
+    });
+  }
+
+  async function deleteDate(id: string) {
+    if (!confirm('确定删除这个纪念日吗？')) return;
+    await sb.from('memorial_dates').delete().eq('id', id);
+    loadDates();
+  }
+
+  addBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    openEditModal();
+  });
+
+  loadDates();
+</script>
+
+<style>
+  .admin-wrapper {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 24px;
+  }
+  .admin-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .admin-header h1 {
+    flex: 1;
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 500;
+  }
+  .back-link {
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    font-size: 0.9rem;
+  }
+  .back-link:hover {
+    color: var(--color-accent);
+  }
+  .btn-primary {
+    padding: 8px 20px;
+    background: var(--color-accent);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 0.9rem;
+  }
+  .btn-primary:hover {
+    background: var(--color-accent-hover);
+  }
+  .dates-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .date-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 24px;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+  }
+  .date-type {
+    font-size: 0.8rem;
+    padding: 4px 10px;
+    border-radius: 12px;
+    background: var(--color-accent-secondary);
+    color: var(--color-accent);
+    display: inline-block;
+    margin-bottom: 8px;
+  }
+  .type-birthday { background: #fff0f0; color: #e07070; }
+  .type-anniversary { background: #fff5eb; color: #d4956a; }
+  .type-memorial { background: #f0f0f0; color: #666; }
+  .type-other { background: #ebf0f5; color: #7890a8; }
+  .date-title {
+    margin: 0 0 4px 0;
+    font-size: 1.1rem;
+    font-weight: 500;
+  }
+  .date-value {
+    font-size: 0.95rem;
+    color: var(--color-text-secondary);
+    margin-bottom: 8px;
+  }
+  .date-desc {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+  }
+  .date-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .btn-edit, .btn-delete {
+    padding: 6px 14px;
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  .btn-edit:hover { border-color: var(--color-accent); color: var(--color-accent); }
+  .btn-delete:hover { border-color: #e07070; color: #e07070; }
+  .loading, .empty-state {
+    text-align: center;
+    padding: 60px 0;
+    color: var(--color-text-muted);
+  }
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  .modal-content {
+    background: var(--color-bg-primary);
+    padding: 32px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 480px;
+  }
+  .modal-content h3 {
+    margin: 0 0 20px 0;
+  }
+  .form-group {
+    margin-bottom: 16px;
+  }
+  .form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+  }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    font-size: 0.95rem;
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    box-sizing: border-box;
+  }
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .btn-cancel {
+    padding: 8px 20px;
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+</style>

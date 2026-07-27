@@ -17,7 +17,9 @@ const year = new Date().getFullYear();
     </p>
 
     <div class="footer-info">
-      <span class="footer-title">{SITE_TITLE}</span>
+      <a href="/" class="footer-title">{SITE_TITLE}</a>
+      <span class="footer-sep">·</span>
+      <a href="/rss.xml" class="footer-link" target="_blank" rel="noopener">RSS</a>
       <span class="footer-sep">·</span>
       <span class="footer-year">{year}</span>
     </div>
@@ -102,5 +104,15 @@ const year = new Date().getFullYear();
   font-size: 0.75rem;
   color: var(--color-text-tertiary);
   letter-spacing: 0.05em;
+}
+
+.footer-link {
+  color: var(--color-text-tertiary);
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.footer-link:hover {
+  color: var(--color-accent);
 }
 </style>

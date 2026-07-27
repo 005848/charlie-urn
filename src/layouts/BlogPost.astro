@@ -15,7 +15,9 @@ interface Props {
   likeCount?: number;
 }
 
-const { title, description, pubDate, updatedDate, coverImage, category, tags = [], postId, viewCount = 0, likeCount = 0 } = Astro.props;
+const { title, description, pubDate, updatedDate, coverImage, category, tags = [], postId, viewCount = 0, likeCount = 0, weather, mood, unlockDate } = Astro.props;
+const isLocked = unlockDate && new Date(unlockDate) > new Date();
+const daysUntil = unlockDate ? Math.ceil((new Date(unlockDate) - new Date()) / (1000 * 60 * 60 * 24)) : 0;
 ---
 
 <Layout title={title} description={description}>
@@ -75,10 +77,31 @@ const { title, description, pubDate, updatedDate, coverImage, category, tags = [
       </div>
     </header>
 
-    <div class="article-body">
+    <!-- 天气/心情 -->
+    {(weather || mood) && (
+      <div class="article-meta-bar">
+        {weather && <span class="meta-item weather">☀️ {weather}</span>}
+        {mood && <span class="meta-item mood">💭 {mood}</span>}
+      </div>
+    )}
+
+    <div class="article-body" class:list={['locked', isLocked]}>
       <div class="prose-custom">
         <slot />
       </div>
+
+      <!-- 时间胶囊未解锁遮罩 -->
+      {isLocked && (
+        <div class="capsule-overlay">
+          <div class="capsule-content">
+            <div class="capsule-icon">🔒</div>
+            <h3 class="capsule-title">这是一封写给未来的信</h3>
+            <p class="capsule-desc">距离解锁还有 <strong>{daysUntil}</strong> 天</p>
+            <p class="capsule-date">解锁时间：<FormattedDate date={unlockDate!} /></p>
+            <div class="capsule-countdown" id="capsule-countdown"></div>
+          </div>
+        </div>
+      )}
     </div>
 
     <footer class="article-footer">
@@ -189,6 +212,23 @@ const { title, description, pubDate, updatedDate, coverImage, category, tags = [
         console.error('点赞失败:', e);
       }
     });
+
+    // 打字机效果（文章首段）
+    const firstParagraph = document.querySelector('.prose-custom p:first-of-type');
+    if (firstParagraph && firstParagraph.textContent.length < 200) {
+      const text = firstParagraph.textContent;
+      firstParagraph.textContent = '';
+      firstParagraph.style.opacity = '1';
+      let i = 0;
+      const typeWriter = () => {
+        if (i < text.length) {
+          firstParagraph.textContent += text.charAt(i);
+          i++;
+          setTimeout(typeWriter, 30);
+        }
+      };
+      setTimeout(typeWriter, 500);
+    }
   }
 </script>
 
@@ -426,4 +466,52 @@ const { title, description, pubDate, updatedDate, coverImage, category, tags = [
   .article-body { padding: 32px 16px; }
   .article-footer { padding: 32px 16px 60px; }
 }
+
+/* 天气心情 */
+.article-meta-bar {
+  display: flex;
+  gap: 20px;
+  padding: 12px 20px;
+  margin: 20px auto 0;
+  max-width: 680px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  justify-content: center;
+}
+.meta-item { display: flex; align-items: center; gap: 6px; }
+
+/* 时间胶囊 */
+.article-body.locked { position: relative; filter: blur(8px); max-height: 400px; overflow: hidden; pointer-events: none; }
+.capsule-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, rgba(250,249,247,0.3) 0%, rgba(250,249,247,0.95) 100%);
+  z-index: 10;
+  pointer-events: auto;
+}
+html[data-theme="dark"] .capsule-overlay {
+  background: linear-gradient(180deg, rgba(28,26,24,0.3) 0%, rgba(28,26,24,0.95) 100%);
+}
+.capsule-content { text-align: center; padding: 40px; }
+.capsule-icon { font-size: 3rem; margin-bottom: 16px; }
+.capsule-title { font-family: "Noto Serif SC", serif; font-size: 1.5rem; font-weight: 500; margin: 0 0 12px; color: var(--text-primary); }
+.capsule-desc { font-size: 1rem; color: var(--text-secondary); margin: 0 0 8px; }
+.capsule-desc strong { color: var(--accent-primary); font-size: 1.2rem; }
+.capsule-date { font-size: 0.875rem; color: var(--text-tertiary); margin: 0 0 16px; }
+.capsule-countdown { font-family: "Inter", monospace; font-size: 0.875rem; color: var(--accent-primary); letter-spacing: 1px; }
+
+/* 打字机光标 */
+.typing-cursor::after {
+  content: '|';
+  display: inline-block;
+  margin-left: 2px;
+  color: var(--accent-primary);
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 </style>

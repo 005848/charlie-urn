@@ -74,6 +74,23 @@ const latestPosts: any[] = [];
         <span class="heading-sub">Latest Memories</span>
       </div>
 
+      <!-- 今日纪念 + 随机回忆 -->
+      <div class="today-memorial" id="today-memorial" style="display:none;">
+        <div class="memorial-icon">🕯️</div>
+        <div class="memorial-text">
+          <span class="memorial-label">今日纪念</span>
+          <span class="memorial-title" id="memorial-title"></span>
+        </div>
+        <span class="memorial-years" id="memorial-years"></span>
+      </div>
+
+      <div class="random-memory-bar">
+        <button id="random-memory-btn" class="random-memory-btn">
+          <span class="random-icon">🎲</span>
+          <span>随机一篇回忆</span>
+        </button>
+      </div>
+
       <div id="latest-posts-container" class="posts-grid">
         <p class="text-center text-[#9a9690] text-sm col-span-full py-12">加载中...</p>
       </div>
@@ -171,6 +188,9 @@ const latestPosts: any[] = [];
       const wordEl = document.getElementById('stat-word-count');
       if (wordEl) wordEl.textContent = '∞';
 
+      // 保存到全局数组用于随机回忆
+      if (posts) allPosts.push(...posts);
+
       // 渲染文章卡片
       const container = document.getElementById('latest-posts-container');
       if (container) {
@@ -193,15 +213,15 @@ const latestPosts: any[] = [];
         }
       }
 
-      // 加载分类统计
-      const { data: allPosts, error: allError } = await supabase
+      // 加载全部文章用于随机回忆
+      const { data: allPostsData, error: allError } = await supabase
         .from('blog_posts')
         .select('category')
         .eq('status', 'published');
 
-      if (!allError && allPosts) {
+      if (!allError && allPostsData) {
         const counts: Record<string, number> = {};
-        for (const p of allPosts) {
+        for (const p of allPostsData) {
           counts[p.category] = (counts[p.category] || 0) + 1;
         }
         document.querySelectorAll<HTMLSpanElement>('.cat-count[data-cat-id]').forEach(el => {
@@ -229,7 +249,52 @@ const latestPosts: any[] = [];
     return div.innerHTML;
   }
 
+  // 随机回忆
+  const allPosts: any[] = [];
+  
+  async function loadMemorialDates() {
+    try {
+      const { data } = await supabase
+        .from('memorial_dates')
+        .select('*')
+        .order('sort_order', { ascending: true });
+      
+      if (data && data.length > 0) {
+        const today = new Date();
+        const todayStr = `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        
+        const todayMemorial = data.find((m: any) => {
+          const d = new Date(m.date);
+          return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` === todayStr;
+        });
+        
+        if (todayMemorial) {
+          const memorialEl = document.getElementById('today-memorial');
+          const titleEl = document.getElementById('memorial-title');
+          const yearsEl = document.getElementById('memorial-years');
+          if (memorialEl && titleEl && yearsEl) {
+            memorialEl.style.display = 'flex';
+            titleEl.textContent = todayMemorial.title;
+            const years = today.getFullYear() - new Date(todayMemorial.date).getFullYear();
+            yearsEl.textContent = `${years} 周年`;
+          }
+        }
+      }
+    } catch(e) { console.log('纪念日历加载失败', e); }
+  }
+
+  // 随机回忆
+  const randomBtn = document.getElementById('random-memory-btn');
+  if (randomBtn) {
+    randomBtn.addEventListener('click', () => {
+      if (allPosts.length === 0) return;
+      const random = allPosts[Math.floor(Math.random() * allPosts.length)];
+      window.location.href = `/blog/${random.slug}`;
+    });
+  }
+
   loadHomeData();
+  loadMemorialDates();
 </script>
 
 <style>
@@ -623,6 +688,61 @@ const latestPosts: any[] = [];
   .categories-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+/* 今日纪念 */
+.today-memorial {
+  background: linear-gradient(135deg, var(--accent-light) 0%, var(--bg-secondary) 100%);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.today-memorial-label {
+  font-size: 0.8rem;
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+
+.today-memorial-title {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.today-memorial-desc {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+/* 随机回忆按钮 */
+.random-recall-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 50px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-bottom: 24px;
+}
+
+.random-recall-btn:hover {
+  background: var(--accent-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(184, 151, 122, 0.3);
+}
+
+.random-recall-btn:active {
+  transform: translateY(0);
 }
 </style>
 
