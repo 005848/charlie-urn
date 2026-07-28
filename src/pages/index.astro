@@ -18,8 +18,24 @@ const latestPosts: any[] = [];
         <span class="particle p3"></span>
         <span class="particle p4"></span>
         <span class="particle p5"></span>
+        <span class="particle p6"></span>
+        <span class="particle p7"></span>
       </div>
       <div class="hero-glow"></div>
+      <div class="hero-glow-secondary"></div>
+      <div class="hero-vignette"></div>
+      <div class="hero-horizontal-line hero-line-top"></div>
+      <div class="hero-horizontal-line hero-line-bottom"></div>
+      <div class="hero-side-decoration hero-side-left">
+        <div class="hero-side-dot"></div>
+        <div class="hero-side-line"></div>
+        <div class="hero-side-dot"></div>
+      </div>
+      <div class="hero-side-decoration hero-side-right">
+        <div class="hero-side-dot"></div>
+        <div class="hero-side-line"></div>
+        <div class="hero-side-dot"></div>
+      </div>
     </div>
 
     <div class="hero-content">
@@ -100,6 +116,20 @@ const latestPosts: any[] = [];
           <span>浏览全部文章</span>
           <span class="cta-arrow">→</span>
         </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Photo Wall / 影像墙 -->
+  <section class="photo-wall-section">
+    <div class="section-inner">
+      <div class="section-heading">
+        <span class="heading-mark">—</span>
+        <h2 class="heading-title">影像记忆</h2>
+        <span class="heading-sub">Photo Memories</span>
+      </div>
+      <div id="photo-wall-container" class="photo-wall">
+        <p class="text-center text-tertiary text-sm col-span-full py-12">加载中...</p>
       </div>
     </div>
   </section>
@@ -193,13 +223,13 @@ const latestPosts: any[] = [];
     }
 
     try {
-      // 加载最近 4 篇文章
+      // 加载最近 6 篇文章（含封面图）
       const { data: posts, error, count } = await supabase
         .from('blog_posts')
-        .select('id, slug, title, description, category, pub_date, tags', { count: 'exact' })
+        .select('id, slug, title, description, category, pub_date, tags, cover_image, mood, weather', { count: 'exact' })
         .eq('status', 'published')
         .order('pub_date', { ascending: false })
-        .range(0, 3);
+        .range(0, 5);
 
       if (error) throw error;
 
@@ -213,25 +243,67 @@ const latestPosts: any[] = [];
       // 保存到全局数组用于随机回忆
       if (posts) allPosts.push(...posts);
 
-      // 渲染文章卡片
+      // 渲染文章卡片（第一篇大卡 + 其余小卡）
       const container = document.getElementById('latest-posts-container');
       if (container) {
         if (!posts || posts.length === 0) {
           container.innerHTML = `<p class="text-center text-[#9a9690] text-sm col-span-full py-12">暂无文章</p>`;
         } else {
-          container.innerHTML = posts.map((post: any) => `
-            <a href="/post?slug=${post.slug}" class="post-card animate-fade-in-up">
-              <div class="post-card-meta">
-                <span class="post-card-category">${categoryLabels[post.category] || post.category}</span>
-                <span class="post-card-date">${formatDate(post.pub_date)}</span>
+          const featured = posts[0];
+          const rest = posts.slice(1);
+
+          let html = `
+            <!-- Featured Large Card -->
+            <a href="/post?slug=${featured.slug}" class="featured-card animate-fade-in-up">
+              <div class="featured-image">
+                ${featured.cover_image
+                  ? `<img src="${featured.cover_image}" alt="${escapeHtml(featured.title)}" loading="lazy">`
+                  : `<div class="featured-image-placeholder">
+                       <span class="placeholder-icon">❖</span>
+                     </div>`
+                }
+                <div class="featured-badge">最新</div>
               </div>
-              <h3 class="post-card-title">${escapeHtml(post.title)}</h3>
-              <p class="post-card-excerpt">${escapeHtml(post.description || '')}</p>
-              <div class="post-card-footer">
-                <span class="read-more">阅读全文 →</span>
+              <div class="featured-content">
+                <div class="featured-meta">
+                  <span class="featured-category">${categoryLabels[featured.category] || featured.category}</span>
+                  <span class="featured-dot">·</span>
+                  <span class="featured-date">${formatDate(featured.pub_date)}</span>
+                  ${featured.mood ? `<span class="featured-dot">·</span><span class="featured-mood">${featured.mood}</span>` : ''}
+                </div>
+                <h3 class="featured-title">${escapeHtml(featured.title)}</h3>
+                <p class="featured-excerpt">${escapeHtml(featured.description || '')}</p>
+                <div class="featured-footer">
+                  <span class="read-more">继续阅读 →</span>
+                </div>
               </div>
             </a>
-          `).join('');
+          `;
+
+          if (rest.length > 0) {
+            html += `<div class="small-cards-grid">`;
+            html += rest.map((post: any) => `
+              <a href="/post?slug=${post.slug}" class="post-card post-card--small animate-fade-in-up">
+                ${post.cover_image
+                  ? `<div class="post-card-cover">
+                       <img src="${post.cover_image}" alt="${escapeHtml(post.title)}" loading="lazy">
+                     </div>`
+                  : ''
+                }
+                <div class="post-card-body">
+                  <div class="post-card-meta">
+                    <span class="post-card-category">${categoryLabels[post.category] || post.category}</span>
+                    <span class="post-card-date">${formatDate(post.pub_date)}</span>
+                  </div>
+                  <h3 class="post-card-title">${escapeHtml(post.title)}</h3>
+                  <p class="post-card-excerpt">${escapeHtml(post.description || '')}</p>
+                </div>
+              </a>
+            `).join('');
+            html += `</div>`;
+          }
+
+          container.innerHTML = html;
         }
       }
 
@@ -251,6 +323,9 @@ const latestPosts: any[] = [];
           el.textContent = `${counts[catId] || 0} 篇`;
         });
       }
+      // 加载影像墙
+      loadPhotoWall(supabase);
+
     } catch (err) {
       console.error('加载文章失败', err);
       const container = document.getElementById('latest-posts-container');
@@ -264,6 +339,38 @@ const latestPosts: any[] = [];
 
     // 计算运行天数
     calculateDays();
+  }
+
+  // 加载影像墙
+  async function loadPhotoWall(supabase: any) {
+    try {
+      const { data: posts } = await supabase
+        .from('blog_posts')
+        .select('id, slug, title, cover_image')
+        .eq('status', 'published')
+        .not('cover_image', 'is', null)
+        .order('pub_date', { ascending: false })
+        .limit(12);
+
+      const container = document.getElementById('photo-wall-container');
+      if (!container) return;
+
+      if (!posts || posts.length === 0) {
+        container.style.display = 'none';
+        return;
+      }
+
+      container.innerHTML = posts.map((post: any, index: number) => `
+        <a href="/post?slug=${post.slug}" class="photo-wall-item animate-fade-in-up" style="animation-delay: ${index * 60}ms">
+          <img src="${post.cover_image}" alt="${escapeHtml(post.title)}" loading="lazy">
+          <div class="photo-wall-overlay">
+            <span class="photo-wall-title">${escapeHtml(post.title)}</span>
+          </div>
+        </a>
+      `).join('');
+    } catch (err) {
+      console.error('加载影像墙失败', err);
+    }
   }
 
   // 加载留言数据
@@ -424,17 +531,94 @@ const latestPosts: any[] = [];
 
 .hero-glow {
   position: absolute;
-  top: 30%;
+  top: 20%;
   left: 50%;
   transform: translateX(-50%);
-  width: 400px;
-  height: 400px;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(184, 151, 122, 0.12) 0%,
+    rgba(212, 196, 176, 0.06) 40%,
+    transparent 70%
+  );
+  border-radius: 50%;
+  filter: blur(40px);
+}
+
+.hero-glow-secondary {
+  position: absolute;
+  bottom: 10%;
+  left: 20%;
+  width: 300px;
+  height: 300px;
   background: radial-gradient(
     circle,
     rgba(184, 151, 122, 0.08) 0%,
     transparent 70%
   );
   border-radius: 50%;
+  filter: blur(30px);
+}
+
+.hero-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 40%,
+    rgba(44, 42, 40, 0.03) 100%
+  );
+  pointer-events: none;
+}
+
+.hero-horizontal-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-border) 20%,
+    var(--color-border) 80%,
+    transparent 100%
+  );
+  opacity: 0.6;
+}
+
+.hero-line-top { top: 25%; }
+.hero-line-bottom { bottom: 25%; }
+
+.hero-side-decoration {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  opacity: 0.4;
+}
+
+.hero-side-left { left: 40px; }
+.hero-side-right { right: 40px; }
+
+.hero-side-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: var(--color-accent-primary);
+}
+
+.hero-side-line {
+  width: 1px;
+  height: 40px;
+  background: linear-gradient(
+    180deg,
+    var(--color-accent-primary) 0%,
+    transparent 100%
+  );
+  margin: 0 auto;
 }
 
 .hero-particles {
@@ -457,6 +641,8 @@ const latestPosts: any[] = [];
 .p3 { top: 30%; right: 25%; animation-delay: 4s; }
 .p4 { top: 70%; right: 20%; animation-delay: 1s; width: 3px; height: 3px; }
 .p5 { top: 80%; left: 40%; animation-delay: 3s; }
+.p6 { top: 15%; left: 60%; animation-delay: 5s; width: 2px; height: 2px; }
+.p7 { top: 45%; right: 35%; animation-delay: 2.5s; width: 2px; height: 2px; }
 
 @keyframes float {
   0%, 100% { opacity: 0; transform: translateY(20px); }
@@ -625,6 +811,209 @@ const latestPosts: any[] = [];
 .posts-grid {
   display: flex;
   flex-direction: column;
+  gap: 32px;
+}
+
+/* Featured Card - 大卡 */
+.featured-card {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 40px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.4s var(--ease-smooth);
+  align-items: stretch;
+}
+
+.featured-card:hover {
+  border-color: var(--color-accent-primary);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(44, 42, 40, 0.08);
+}
+
+.featured-image {
+  position: relative;
+  overflow: hidden;
+  min-height: 320px;
+  background: var(--color-bg-secondary);
+}
+
+.featured-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s var(--ease-smooth);
+}
+
+.featured-card:hover .featured-image img {
+  transform: scale(1.05);
+}
+
+.featured-image-placeholder {
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    135deg,
+    var(--color-bg-secondary) 0%,
+    #e8e5e0 100%
+  );
+}
+
+.placeholder-icon {
+  font-size: 3rem;
+  color: var(--color-accent-secondary);
+  opacity: 0.5;
+}
+
+.featured-badge {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  padding: 4px 12px;
+  background: var(--color-accent-primary);
+  color: #fff;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  border-radius: 4px;
+  z-index: 1;
+}
+
+.featured-content {
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.featured-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--color-text-tertiary);
+  margin-bottom: 16px;
+}
+
+.featured-category {
+  color: var(--color-accent-primary);
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.featured-dot {
+  opacity: 0.4;
+}
+
+.featured-title {
+  font-family: var(--font-serif);
+  font-size: 1.8rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--color-text-primary);
+  margin-bottom: 16px;
+  transition: color 0.3s;
+}
+
+.featured-card:hover .featured-title {
+  color: var(--color-accent-primary);
+}
+
+.featured-excerpt {
+  font-size: 0.95rem;
+  line-height: 1.8;
+  color: var(--color-text-secondary);
+  margin-bottom: 24px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.featured-footer {
+  margin-top: auto;
+}
+
+/* Small Cards Grid */
+.small-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.post-card--small {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.3s var(--ease-smooth);
+}
+
+.post-card--small:hover {
+  border-color: var(--color-accent-primary);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(44, 42, 40, 0.06);
+}
+
+.post-card-cover {
+  width: 100%;
+  height: 180px;
+  overflow: hidden;
+  background: var(--color-bg-secondary);
+}
+
+.post-card-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s var(--ease-smooth);
+}
+
+.post-card--small:hover .post-card-cover img {
+  transform: scale(1.05);
+}
+
+.post-card-body {
+  padding: 20px 24px 24px;
+}
+
+@media (max-width: 768px) {
+  .featured-card {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .featured-image {
+    min-height: 220px;
+  }
+
+  .featured-content {
+    padding: 28px 24px;
+  }
+
+  .featured-title {
+    font-size: 1.4rem;
+  }
+
+  .small-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .post-card-cover {
+    height: 160px;
+  }
 }
 
 .section-cta {
@@ -657,6 +1046,84 @@ const latestPosts: any[] = [];
 
 .cta-link:hover .cta-arrow {
   transform: translateX(4px);
+}
+
+/* Photo Wall / 影像墙 */
+.photo-wall-section {
+  padding: 80px 0;
+  background: var(--color-bg-secondary);
+}
+
+.photo-wall {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 200px;
+  gap: 12px;
+  grid-auto-flow: dense;
+}
+
+.photo-wall-item {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.photo-wall-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s var(--ease-smooth), filter 0.4s var(--ease-smooth);
+  filter: grayscale(20%) brightness(0.95);
+}
+
+.photo-wall-item:hover img {
+  transform: scale(1.08);
+  filter: grayscale(0%) brightness(1);
+}
+
+.photo-wall-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 50%,
+    rgba(44, 42, 40, 0.7) 100%
+  );
+  opacity: 0;
+  transition: opacity 0.4s var(--ease-smooth);
+  display: flex;
+  align-items: flex-end;
+  padding: 20px;
+}
+
+.photo-wall-item:hover .photo-wall-overlay {
+  opacity: 1;
+}
+
+.photo-wall-title {
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 400;
+  line-height: 1.5;
+  transform: translateY(10px);
+  transition: transform 0.4s var(--ease-smooth);
+}
+
+.photo-wall-item:hover .photo-wall-title {
+  transform: translateY(0);
+}
+
+/* 错落布局：第 1、5、9 张跨 2x2 */
+.photo-wall-item:nth-child(6n + 1) {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+
+/* 第 3、7 张横向跨 2 列 */
+.photo-wall-item:nth-child(6n + 3) {
+  grid-column: span 2;
 }
 
 /* Categories */
@@ -794,6 +1261,16 @@ const latestPosts: any[] = [];
 
   .categories-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .photo-wall {
+    grid-template-columns: repeat(2, 1fr);
+    grid-auto-rows: 140px;
+    gap: 8px;
+  }
+
+  .photo-wall-section {
+    padding: 60px 0;
   }
 }
 
