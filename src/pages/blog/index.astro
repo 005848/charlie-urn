@@ -214,7 +214,7 @@ import { CATEGORIES } from '../../consts';
     ).join('');
 
     return `
-      <a href="/blog/view/?slug=${post.slug}" class="post-card animate-fade-in-up">
+      <a href="/post?slug=${post.slug}" class="post-card animate-fade-in-up">
         <div class="post-card-meta">
           <span class="post-card-category">${catLabel}</span>
           <span class="post-card-date">${dateStr}</span>
@@ -238,7 +238,7 @@ import { CATEGORIES } from '../../consts';
             <span class="dot-inner"></span>
           </div>
           <div class="timeline-content">
-            <a href="/blog/view/?slug=${post.slug}" class="timeline-link">
+            <a href="/post?slug=${post.slug}" class="timeline-link">
               <span class="timeline-date">
                 ${date.getMonth() + 1}月${date.getDate()}日
               </span>

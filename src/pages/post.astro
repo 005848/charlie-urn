@@ -1,0 +1,274 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="加载中...">
+  <main class="max-w-3xl mx-auto px-4 py-16 min-h-screen">
+    <div id="article-loading" class="text-center text-secondary">
+      <p>正在加载文章...</p>
+    </div>
+
+    <div id="article-error" class="hidden text-center">
+      <h1 class="text-2xl mb-4">文章加载失败</h1>
+      <p class="text-secondary mb-8">文章可能不存在或已被删除</p>
+      <a href="/blog/" class="inline-block px-6 py-2 border border-accent text-accent rounded hover:bg-accent hover:text-white transition-all">返回目录</a>
+    </div>
+
+    <article id="article-content" class="hidden">
+      <div id="article-cover-wrap" class="hidden mb-8 rounded-lg overflow-hidden">
+        <img id="article-cover-img" class="w-full h-auto object-cover" alt="" />
+      </div>
+
+      <header class="mb-12">
+        <div id="article-meta" class="flex items-center gap-3 text-sm text-tertiary mb-4">
+          <span id="article-date"></span>
+          <span id="article-category" class="px-2 py-0.5 bg-bg-secondary rounded text-xs"></span>
+        </div>
+        <h1 id="article-title" class="font-serif text-3xl md:text-4xl font-medium leading-tight mb-4 text-primary"></h1>
+        <p id="article-description" class="text-secondary text-lg"></p>
+
+        <div id="article-tags-wrap" class="hidden mt-4 flex flex-wrap gap-2">
+        </div>
+
+        <div id="article-mood-wrap" class="hidden mt-4 flex items-center gap-4 text-sm text-tertiary">
+          <span id="article-mood"></span>
+          <span id="article-weather"></span>
+        </div>
+      </header>
+
+      <div id="article-body" class="prose prose-lg max-w-none text-primary leading-relaxed">
+      </div>
+
+      <div class="mt-16 pt-8 border-t border-border flex items-center justify-between">
+        <a href="/blog/" class="text-secondary hover:text-accent transition-colors">← 返回目录</a>
+        <div id="article-like" class="flex items-center gap-2 cursor-pointer text-secondary hover:text-accent transition-colors">
+          <span>♡</span>
+          <span id="like-count">0</span>
+        </div>
+      </div>
+    </article>
+  </main>
+</Layout>
+
+<script is:inline>
+  (function() {
+    // 从 URL 获取 slug
+    const params = new URLSearchParams(window.location.search);
+    const slug = params.get('slug');
+
+    if (!slug) {
+      document.getElementById('article-loading').style.display = 'none';
+      document.getElementById('article-error').style.display = 'block';
+      return;
+    }
+
+    // 从 meta 标签读取 Supabase 配置
+    function getSupabaseConfig() {
+      const urlMeta = document.querySelector('meta[name="x-supabase-url"]');
+      const keyMeta = document.querySelector('meta[name="x-supabase-anon-key"]');
+      if (!urlMeta || !keyMeta || !urlMeta.content || !keyMeta.content) {
+        return null;
+      }
+      return { url: urlMeta.content, anonKey: keyMeta.content };
+    }
+
+    const config = getSupabaseConfig();
+    if (!config) {
+      document.getElementById('article-loading').style.display = 'none';
+      document.getElementById('article-error').style.display = 'block';
+      return;
+    }
+
+    // 加载 marked
+    const markedScript = document.createElement('script');
+    markedScript.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
+    markedScript.onload = function() {
+      // 加载 highlight.js
+      const hljsScript = document.createElement('link');
+      hljsScript.rel = 'stylesheet';
+      hljsScript.href = 'https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css';
+      document.head.appendChild(hljsScript);
+
+      const hljsScript2 = document.createElement('script');
+      hljsScript2.src = 'https://cdn.jsdelivr.net/npm/highlight.js@11/lib/highlight.min.js';
+      hljsScript2.onload = function() {
+        loadArticle(slug, config);
+      };
+      document.head.appendChild(hljsScript2);
+    };
+    document.head.appendChild(markedScript);
+
+    async function loadArticle(slug, config) {
+      if (!window.supabase) {
+        await new Promise((resolve) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+          script.onload = resolve;
+          document.head.appendChild(script);
+        });
+      }
+
+      const sb = window.supabase.createClient(config.url, config.anonKey);
+
+      try {
+        const { data: post, error } = await sb
+          .from('blog_posts')
+          .select('*')
+          .eq('slug', slug)
+          .eq('status', 'published')
+          .single();
+
+        if (error || !post) {
+          throw error || new Error('文章不存在');
+        }
+
+        renderArticle(post, sb);
+      } catch (err) {
+        console.error('加载文章失败:', err);
+        document.getElementById('article-loading').style.display = 'none';
+        document.getElementById('article-error').style.display = 'block';
+      }
+    }
+
+    function renderArticle(post, sb) {
+      document.getElementById('article-loading').style.display = 'none';
+      document.getElementById('article-content').style.display = 'block';
+
+      // 设置标题
+      document.title = post.title + ' — Charlie的电子骨灰盒';
+
+      // 封面图
+      if (post.cover_image) {
+        document.getElementById('article-cover-wrap').style.display = 'block';
+        document.getElementById('article-cover-img').src = post.cover_image;
+        document.getElementById('article-cover-img').alt = post.title;
+      }
+
+      // 日期和分类
+      const pubDate = post.pub_date ? new Date(post.pub_date).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+      document.getElementById('article-date').textContent = pubDate;
+
+      const categoryNames = {
+        memory: '回忆',
+        letter: '书信',
+        essay: '随笔',
+        photo: '影像',
+        poem: '诗'
+      };
+      document.getElementById('article-category').textContent = categoryNames[post.category] || post.category || '';
+
+      // 标题和描述
+      document.getElementById('article-title').textContent = post.title || '';
+      document.getElementById('article-description').textContent = post.description || '';
+
+      // 标签
+      if (post.tags && post.tags.length > 0) {
+        const tagsWrap = document.getElementById('article-tags-wrap');
+        tagsWrap.style.display = 'flex';
+        post.tags.forEach(function(tag) {
+          const span = document.createElement('span');
+          span.className = 'px-2 py-1 text-xs bg-bg-secondary rounded text-secondary';
+          span.textContent = '#' + tag;
+          tagsWrap.appendChild(span);
+        });
+      }
+
+      // 心情和天气
+      if (post.mood || post.weather) {
+        document.getElementById('article-mood-wrap').style.display = 'flex';
+        if (post.mood) {
+          document.getElementById('article-mood').textContent = '心情：' + post.mood;
+        }
+        if (post.weather) {
+          document.getElementById('article-weather').textContent = '天气：' + post.weather;
+        }
+      }
+
+      // 正文
+      if (window.marked && window.marked.parse) {
+        document.getElementById('article-body').innerHTML = window.marked.parse(post.content || '');
+      } else {
+        document.getElementById('article-body').textContent = post.content || '';
+      }
+
+      // 代码高亮
+      if (window.hljs) {
+        document.querySelectorAll('pre code').forEach(function(block) {
+          window.hljs.highlightElement(block);
+        });
+      }
+
+      // 点赞数
+      document.getElementById('like-count').textContent = post.like_count || 0;
+
+      // 点赞按钮
+      const likeBtn = document.getElementById('article-like');
+      const visitorId = getVisitorId();
+      let liked = false;
+
+      // 检查是否已点赞
+      sb.from('post_likes')
+        .select('id')
+        .eq('post_id', post.id)
+        .eq('visitor_id', visitorId)
+        .then(function(res) {
+          if (res.data && res.data.length > 0) {
+            liked = true;
+            likeBtn.querySelector('span:first-child').textContent = '♥';
+            likeBtn.classList.add('text-accent');
+          }
+        });
+
+      likeBtn.addEventListener('click', async function() {
+        if (liked) {
+          // 取消点赞
+          const { error } = await sb
+            .from('post_likes')
+            .delete()
+            .eq('post_id', post.id)
+            .eq('visitor_id', visitorId);
+
+          if (!error) {
+            liked = false;
+            likeBtn.querySelector('span:first-child').textContent = '♡';
+            likeBtn.classList.remove('text-accent');
+            const count = parseInt(document.getElementById('like-count').textContent) || 0;
+            document.getElementById('like-count').textContent = Math.max(count - 1, 0);
+          }
+        } else {
+          // 点赞
+          const { error } = await sb
+            .from('post_likes')
+            .insert({
+              post_id: post.id,
+              visitor_id: visitorId,
+              user_agent: navigator.userAgent
+            });
+
+          if (!error) {
+            liked = true;
+            likeBtn.querySelector('span:first-child').textContent = '♥';
+            likeBtn.classList.add('text-accent');
+            const count = parseInt(document.getElementById('like-count').textContent) || 0;
+            document.getElementById('like-count').textContent = count + 1;
+          }
+        }
+      });
+
+      // 增加浏览量
+      if (!sessionStorage.getItem('viewed_' + slug)) {
+        sb.rpc('increment_view_count', { post_slug: slug }).catch(function() {});
+        sessionStorage.setItem('viewed_' + slug, '1');
+      }
+    }
+
+    function getVisitorId() {
+      let id = localStorage.getItem('visitor_id');
+      if (!id) {
+        id = 'v_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+        localStorage.setItem('visitor_id', id);
+      }
+      return id;
+    }
+  })();
+</script>
