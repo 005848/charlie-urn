@@ -27,3 +27,4 @@ pnpm-debug.log*
 .preview
 .cozeproj/reduction
 .codegraph
+assets/
