@@ -512,117 +512,141 @@ const latestPosts: any[] = [];
 </script>
 
 <style>
-/* Hero Section */
+/* Hero Section - mimocode 风格 */
 .hero {
   position: relative;
-  min-height: calc(100vh - 72px);
+  min-height: calc(100vh - 64px);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   padding: 80px 24px;
+  background-color: var(--color-bg-primary);
 }
 
 .hero-bg {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  overflow: hidden;
 }
 
-.hero-glow {
+.hero-glow-main {
   position: absolute;
-  top: 15%;
+  top: 20%;
   left: 50%;
   transform: translateX(-50%);
-  width: 700px;
-  height: 500px;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(184, 151, 122, 0.25) 0%,
-    rgba(212, 196, 176, 0.15) 35%,
-    rgba(250, 249, 247, 0) 70%
-  );
+  width: 600px;
+  height: 600px;
   border-radius: 50%;
+  background: radial-gradient(circle, rgba(184, 151, 122, 0.2) 0%, rgba(184, 151, 122, 0.06) 40%, transparent 70%);
   filter: blur(30px);
+  animation: hero-pulse 8s ease-in-out infinite;
 }
 
 .hero-glow-secondary {
   position: absolute;
-  bottom: 15%;
-  left: 15%;
-  width: 350px;
-  height: 350px;
-  background: radial-gradient(
-    circle,
-    rgba(184, 151, 122, 0.18) 0%,
-    transparent 65%
-  );
+  bottom: 10%;
+  right: 15%;
+  width: 400px;
+  height: 400px;
   border-radius: 50%;
-  filter: blur(25px);
+  background: radial-gradient(circle, rgba(180, 160, 140, 0.12) 0%, transparent 60%);
+  filter: blur(20px);
+  animation: hero-pulse 10s ease-in-out infinite reverse;
 }
 
+@keyframes hero-pulse {
+  0%, 100% { opacity: 0.8; transform: translateX(-50%) scale(1); }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.08); }
+}
+
+.hero-glow-secondary {
+  animation-name: hero-pulse-secondary;
+}
+
+@keyframes hero-pulse-secondary {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+/* 暗色模式：深灰底 + 冷白光 */
+html[data-theme="dark"] .hero-glow-main {
+  background: radial-gradient(circle, rgba(200, 200, 210, 0.15) 0%, rgba(200, 200, 210, 0.05) 40%, transparent 70%);
+}
+
+html[data-theme="dark"] .hero-glow-secondary {
+  background: radial-gradient(circle, rgba(150, 140, 160, 0.1) 0%, transparent 60%);
+}
+
+/* 暗角 */
 .hero-vignette {
   position: absolute;
   inset: 0;
-  background: radial-gradient(
-    ellipse at center,
-    transparent 50%,
-    rgba(44, 42, 40, 0.06) 100%
-  );
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.06) 100%);
   pointer-events: none;
 }
 
+html[data-theme="dark"] .hero-vignette {
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.4) 100%);
+}
+
+/* 水平分割线 */
 .hero-horizontal-line {
   position: absolute;
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(184, 151, 122, 0.3) 20%,
-    rgba(184, 151, 122, 0.3) 80%,
-    transparent 100%
-  );
-  opacity: 1;
+  background: linear-gradient(90deg, transparent 0%, var(--color-border) 20%, var(--color-border) 80%, transparent 100%);
 }
 
 .hero-line-top { top: 22%; }
 .hero-line-bottom { bottom: 22%; }
 
+html[data-theme="dark"] .hero-horizontal-line {
+  background: linear-gradient(90deg, transparent 0%, #333 20%, #333 80%, transparent 100%);
+}
+
+/* 两侧装饰 */
 .hero-side-decoration {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 12px;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
-.hero-side-left { left: 40px; }
-.hero-side-right { right: 40px; }
+.hero-side-left { left: 60px; }
+.hero-side-right { right: 60px; }
 
 .hero-side-dot {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background-color: var(--color-accent-primary);
-  box-shadow: 0 0 8px rgba(184, 151, 122, 0.5);
+  background-color: var(--color-text-primary);
+  opacity: 0.5;
 }
 
 .hero-side-line {
   width: 1px;
-  height: 48px;
-  background: linear-gradient(
-    180deg,
-    var(--color-accent-primary) 0%,
-    transparent 100%
-  );
+  height: 80px;
+  background: linear-gradient(180deg, var(--color-text-primary), transparent);
   margin: 0 auto;
-  opacity: 0.5;
+  opacity: 0.2;
 }
 
+html[data-theme="dark"] .hero-side-dot {
+  background-color: #e0e0e0;
+}
+
+html[data-theme="dark"] .hero-side-line {
+  background: linear-gradient(180deg, #c0c0c0, transparent);
+}
+
+/* 粒子 */
 .hero-particles {
   position: absolute;
   inset: 0;
@@ -630,26 +654,29 @@ const latestPosts: any[] = [];
 
 .particle {
   position: absolute;
-  width: 5px;
-  height: 5px;
-  background-color: var(--color-accent-primary);
+  width: 4px;
+  height: 4px;
+  background-color: var(--color-text-primary);
   border-radius: 50%;
   opacity: 0;
-  box-shadow: 0 0 10px rgba(184, 151, 122, 0.6);
-  animation: float 8s ease-in-out infinite;
+  animation: particle-float 8s ease-in-out infinite;
+}
+
+html[data-theme="dark"] .particle {
+  background-color: #e0e0e0;
 }
 
 .p1 { top: 20%; left: 20%; animation-delay: 0s; }
-.p2 { top: 60%; left: 15%; animation-delay: 2s; width: 4px; height: 4px; }
+.p2 { top: 60%; left: 15%; animation-delay: 2s; width: 3px; height: 3px; }
 .p3 { top: 30%; right: 25%; animation-delay: 4s; }
-.p4 { top: 70%; right: 20%; animation-delay: 1s; width: 4px; height: 4px; }
+.p4 { top: 70%; right: 20%; animation-delay: 1s; width: 3px; height: 3px; }
 .p5 { top: 80%; left: 40%; animation-delay: 3s; }
 .p6 { top: 15%; left: 60%; animation-delay: 5s; width: 3px; height: 3px; }
 .p7 { top: 45%; right: 35%; animation-delay: 2.5s; width: 3px; height: 3px; }
 
-@keyframes float {
+@keyframes particle-float {
   0%, 100% { opacity: 0; transform: translateY(20px); }
-  50% { opacity: 0.6; transform: translateY(-20px); }
+  50% { opacity: 0.3; transform: translateY(-20px); }
 }
 
 .hero-content {
@@ -668,39 +695,44 @@ const latestPosts: any[] = [];
 }
 
 .symbol-ornament {
-  color: var(--color-accent-primary);
+  color: var(--color-text-tertiary);
   font-size: 0.8rem;
   opacity: 0.6;
 }
 
 .symbol-dot {
-  width: 12px;
-  height: 12px;
-  background-color: var(--color-accent-primary);
+  width: 10px;
+  height: 10px;
+  background-color: var(--color-text-primary);
   border-radius: 50%;
-  box-shadow: 0 0 20px rgba(184, 151, 122, 0.5);
+  opacity: 0.8;
+}
+
+html[data-theme="dark"] .symbol-dot {
+  background-color: #f0f0f0;
 }
 
 .hero-title {
-  font-family: var(--font-serif);
-  font-size: clamp(2rem, 6vw, 3.2rem);
-  font-weight: 500;
+  font-family: var(--font-sans);
+  font-size: clamp(2rem, 6vw, 3rem);
+  font-weight: 600;
   color: var(--color-text-primary);
-  letter-spacing: 0.08em;
-  margin-bottom: 20px;
+  letter-spacing: 0.05em;
+  margin-bottom: 16px;
   line-height: 1.3;
 }
 
 .hero-subtitle {
-  font-size: 1rem;
+  font-size: 0.95rem;
   color: var(--color-text-secondary);
-  letter-spacing: 0.15em;
+  letter-spacing: 0.1em;
   margin-bottom: 48px;
+  font-weight: 450;
 }
 
 .hero-quote {
   font-family: var(--font-serif);
-  font-size: 1.05rem;
+  font-size: 1rem;
   line-height: 2;
   color: var(--color-text-secondary);
   font-style: italic;
@@ -711,7 +743,7 @@ const latestPosts: any[] = [];
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 20px;
+  gap: 24px;
   margin-bottom: 64px;
 }
 
@@ -723,22 +755,23 @@ const latestPosts: any[] = [];
 }
 
 .meta-num {
-  font-family: var(--font-serif);
-  font-size: 1.5rem;
-  font-weight: 500;
+  font-family: var(--font-sans);
+  font-size: 1.4rem;
+  font-weight: 600;
   color: var(--color-text-primary);
 }
 
 .meta-label {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: var(--color-text-tertiary);
   letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .meta-divider {
-  color: var(--color-text-tertiary);
-  font-size: 0.8rem;
-  opacity: 0.5;
+  color: var(--color-border);
+  font-size: 1rem;
+  opacity: 0.8;
 }
 
 .hero-scroll {
@@ -749,19 +782,16 @@ const latestPosts: any[] = [];
 }
 
 .scroll-text {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: var(--color-text-tertiary);
   letter-spacing: 0.2em;
+  text-transform: uppercase;
 }
 
 .scroll-line {
   width: 1px;
   height: 40px;
-  background: linear-gradient(
-    to bottom,
-    var(--color-text-tertiary),
-    transparent
-  );
+  background: linear-gradient(to bottom, var(--color-text-tertiary), transparent);
   animation: scrollLine 2s ease-in-out infinite;
 }
 

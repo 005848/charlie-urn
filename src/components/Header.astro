@@ -79,17 +79,21 @@ const pathname = Astro.url.pathname;
   position: sticky;
   top: 0;
   z-index: 50;
-  background-color: rgba(250, 249, 247, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--color-border-soft);
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--color-border);
+}
+
+html[data-theme="dark"] .site-header {
+  background-color: rgba(15, 15, 15, 0.85);
 }
 
 .header-inner {
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 0 24px;
-  height: 72px;
+  padding: 0 32px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -101,35 +105,39 @@ const pathname = Astro.url.pathname;
   gap: 12px;
   text-decoration: none;
   color: var(--color-text-primary);
-  transition: opacity 0.3s var(--ease-smooth);
+  transition: opacity 0.2s var(--ease-smooth);
 }
 
 .logo-link:hover {
-  opacity: 0.8;
+  opacity: 0.7;
 }
 
 .logo-mark {
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--color-accent-primary);
+  width: 28px;
+  height: 28px;
+  border: 1.5px solid var(--color-text-primary);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
+  transition: all 0.3s var(--ease-smooth);
+}
+
+.logo-link:hover .logo-mark {
+  background-color: var(--color-text-primary);
 }
 
 .logo-dot {
-  width: 8px;
-  height: 8px;
-  background-color: var(--color-accent-primary);
+  width: 6px;
+  height: 6px;
+  background-color: var(--color-text-primary);
   border-radius: 50%;
-  animation: breathe 4s ease-in-out infinite;
+  transition: all 0.3s var(--ease-smooth);
 }
 
-@keyframes breathe {
-  0%, 100% { opacity: 0.5; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.1); }
+.logo-link:hover .logo-dot {
+  background-color: var(--color-bg-primary);
 }
 
 .logo-text {
@@ -139,58 +147,45 @@ const pathname = Astro.url.pathname;
 }
 
 .logo-title {
-  font-family: var(--font-serif);
-  font-size: 1rem;
-  font-weight: 500;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 600;
   color: var(--color-text-primary);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
 }
 
 .logo-subtitle {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: var(--color-text-tertiary);
   letter-spacing: 0.1em;
+  margin-top: 2px;
 }
 
 .nav-menu {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   align-items: center;
 }
 
 .nav-link {
-  padding: 8px 16px;
-  font-size: 0.9rem;
+  padding: 6px 16px;
+  font-size: 0.88rem;
+  font-weight: 500;
   color: var(--color-text-secondary);
   text-decoration: none;
-  position: relative;
-  transition: color 0.3s var(--ease-smooth);
-}
-
-.nav-link::after {
-  content: '';
-  position: absolute;
-  bottom: 4px;
-  left: 16px;
-  right: 16px;
-  height: 1px;
-  background-color: var(--color-accent-primary);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.3s var(--ease-smooth);
+  border-radius: 4px;
+  transition: all 0.2s var(--ease-smooth);
 }
 
 .nav-link:hover {
   color: var(--color-text-primary);
-}
-
-.nav-link:hover::after,
-.nav-link.active::after {
-  transform: scaleX(1);
+  background-color: var(--color-bg-secondary);
 }
 
 .nav-link.active {
   color: var(--color-text-primary);
+  background-color: var(--color-text-primary);
+  color: var(--color-bg-primary);
 }
 
 .menu-toggle {
