@@ -1,10 +1,6 @@
 // 浏览器端 Supabase 客户端（使用 anon key）
 import { createClient } from '@supabase/supabase-js';
 
-// 硬编码兜底配置（部署时无环境变量也能正常运行）
-const FALLBACK_URL = 'https://fmjdtehxewybtgokzmob.supabase.co';
-const FALLBACK_ANON_KEY = 'sb_publishable_ann2PFDdRhFc570RXcbpiQ_2vIoUUiS';
-
 let supabaseInstance: ReturnType<typeof createClient> | null = null;
 
 export function getSupabase() {
@@ -16,10 +12,10 @@ export function getSupabase() {
   const { url, anonKey } = getSupabaseConfig();
 
   if (!url || !anonKey) {
-    console.warn('[Supabase] 未配置 Supabase URL 或 ANON_KEY');
+    console.warn('[Supabase] 未配置 Supabase URL 或 ANON_KEY，请在部署环境设置 PUBLIC_SUPABASE_URL 和 PUBLIC_SUPABASE_ANON_KEY');
   }
 
-  supabaseInstance = createClient(url || FALLBACK_URL, anonKey || FALLBACK_ANON_KEY, {
+  supabaseInstance = createClient(url || '', anonKey || '', {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
