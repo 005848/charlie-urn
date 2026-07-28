@@ -80,6 +80,37 @@ import { CATEGORIES } from '../../../consts';
           />
         </div>
 
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="weather" class="block text-sm text-[#6b6864] mb-2">天气</label>
+            <input
+              type="text"
+              id="weather"
+              class="w-full px-4 py-3 bg-white border border-[#e5e2dd] rounded-lg focus:outline-none focus:border-[#b8977a] transition-colors text-[#2c2a28]"
+              placeholder="晴 / 雨 / 多云..."
+            />
+          </div>
+          <div>
+            <label for="mood" class="block text-sm text-[#6b6864] mb-2">心情</label>
+            <input
+              type="text"
+              id="mood"
+              class="w-full px-4 py-3 bg-white border border-[#e5e2dd] rounded-lg focus:outline-none focus:border-[#b8977a] transition-colors text-[#2c2a28]"
+              placeholder="平静 / 思念 / 温暖..."
+            />
+          </div>
+        </div>
+
+        <div>
+          <label for="unlock_date" class="block text-sm text-[#6b6864] mb-2">时间胶囊 · 解锁日期（可选）</label>
+          <input
+            type="date"
+            id="unlock_date"
+            class="w-full px-4 py-3 bg-white border border-[#e5e2dd] rounded-lg focus:outline-none focus:border-[#b8977a] transition-colors text-[#2c2a28]"
+          />
+          <p class="text-xs text-[#9a9690] mt-1">设置后，文章将在指定日期之前对访客隐藏</p>
+        </div>
+
         <div>
           <label for="description" class="block text-sm text-[#6b6864] mb-2">摘要</label>
           <textarea
@@ -122,6 +153,20 @@ import { CATEGORIES } from '../../../consts';
           ></textarea>
           <div id="upload-status" class="mt-2 text-xs text-[#9a9690] hidden">
             正在上传... <span id="upload-progress">0%</span>
+          </div>
+        </div>
+
+        <!-- 实时预览 -->
+        <div class="mt-6">
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-sm text-[#6b6864]">实时预览</label>
+            <span class="text-xs text-[#9a9690]">Markdown 渲染</span>
+          </div>
+          <div
+            id="preview"
+            class="prose-content min-h-[200px] p-4 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-[#2c2a28] text-sm"
+          >
+            <p class="text-[#9a9690]">预览将显示在这里...</p>
           </div>
         </div>
 
