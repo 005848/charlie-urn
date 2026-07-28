@@ -262,7 +262,15 @@ import Layout from '../layouts/Layout.astro';
 
     // 增加浏览量
     if (!sessionStorage.getItem('viewed_' + slug)) {
-      sb.rpc('increment_view_count', { post_slug: slug }).catch(() => {});
+      try {
+        const result = sb.rpc('increment_view_count', { post_slug: slug });
+        // 兼容 thenable，忽略结果
+        if (result && typeof result.then === 'function') {
+          result.then(() => {}, () => {});
+        }
+      } catch {
+        // 忽略浏览量统计错误
+      }
       sessionStorage.setItem('viewed_' + slug, '1');
     }
   }
