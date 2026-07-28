@@ -39,13 +39,14 @@ import { CATEGORIES } from '../../../consts';
         <!-- 封面图 -->
         <div>
           <label class="block text-sm text-[#6b6864] mb-2">封面图</label>
+          <input type="hidden" id="cover_image" name="cover_image" value="" />
           <div id="cover-image-container" class="hidden mb-3">
-            <img id="cover-image-preview" class="w-full h-48 object-cover rounded-lg border border-[#e5e2dd]" />
+            <img id="cover-preview" class="w-full h-48 object-cover rounded-lg border border-[#e5e2dd]" />
             <button type="button" id="remove-cover" class="mt-2 text-xs text-[#6b6864] hover:text-[#b8977a]">移除封面图</button>
           </div>
           <label class="cursor-pointer inline-block px-4 py-2 bg-[#f0eeeb] hover:bg-[#e5e2dd] text-[#6b6864] rounded-md transition-colors text-sm">
             📷 上传封面图
-            <input type="file" accept="image/*" class="hidden" id="upload-cover" />
+            <input type="file" accept="image/*" class="hidden" id="cover-upload" />
           </label>
         </div>
 
@@ -357,6 +358,19 @@ import { CATEGORIES } from '../../../consts';
       setTimeout(() => {
         uploadStatus?.classList.add('hidden');
       }, 2000);
+    });
+
+    // --- 移除封面图 ---
+    const removeCoverBtn = document.getElementById('remove-cover') as HTMLButtonElement;
+    const coverImageContainer = document.getElementById('cover-image-container') as HTMLDivElement;
+    removeCoverBtn?.addEventListener('click', () => {
+      if (coverPreview) {
+        coverPreview.src = '';
+        coverPreview.style.display = 'none';
+      }
+      if (coverImageContainer) coverImageContainer.classList.add('hidden');
+      if (coverUrlInput) coverUrlInput.value = '';
+      if (coverInput) coverInput.value = '';
     });
 
     // --- 媒体上传功能 ---
