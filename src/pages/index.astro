@@ -253,6 +253,8 @@ const latestPosts: any[] = [];
   const allPosts: any[] = [];
   
   async function loadMemorialDates() {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
     try {
       const { data } = await supabase
         .from('memorial_dates')
