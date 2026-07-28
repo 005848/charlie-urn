@@ -8,13 +8,13 @@ import Layout from '../layouts/Layout.astro';
       <div class="animate-pulse">正在加载文章...</div>
     </div>
 
-    <div id="article-error" class="hidden text-center py-20">
+    <div id="article-error" class="text-center py-20" style="display:none;">
       <p class="text-tertiary mb-6">文章加载失败</p>
       <a href="/blog/" class="text-accent hover:underline">← 返回目录</a>
     </div>
 
-    <div id="article-content" class="hidden">
-      <div id="article-cover-wrap" class="hidden mb-8 rounded-lg overflow-hidden">
+    <div id="article-content" style="display:none;">
+      <div id="article-cover-wrap" class="mb-8 rounded-lg overflow-hidden" style="display:none;">
         <img id="article-cover-img" class="w-full h-auto object-cover" alt="">
       </div>
 
@@ -28,9 +28,10 @@ import Layout from '../layouts/Layout.astro';
 
         <p id="article-description" class="text-secondary text-lg"></p>
 
-        <div id="article-tags-wrap" class="hidden mt-4 flex flex-wrap gap-2"></div>
+        <div id="article-tags-wrap" class="mt-4 flex flex-wrap gap-2" style="display:none;">
+        </div>
 
-        <div id="article-mood-wrap" class="hidden mt-4 flex items-center gap-4 text-sm text-tertiary">
+        <div id="article-mood-wrap" class="mt-4 flex items-center gap-4 text-sm text-tertiary" style="display:none;">
           <span id="article-mood"></span>
           <span id="article-weather"></span>
         </div>
@@ -112,8 +113,10 @@ import Layout from '../layouts/Layout.astro';
 
   function renderArticle(post: any, sb: any) {
     const loading = document.getElementById('article-loading');
+    const error = document.getElementById('article-error');
     const content = document.getElementById('article-content');
     if (loading) loading.style.display = 'none';
+    if (error) error.style.display = 'none';
     if (content) content.style.display = 'block';
 
     // 设置标题
