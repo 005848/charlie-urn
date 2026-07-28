@@ -3,6 +3,17 @@ import Layout from '../layouts/Layout.astro';
 ---
 
 <Layout title="文章 — Charlie的电子骨灰盒" description="文章详情">
+  <!-- 阅读进度条 -->
+  <div id="reading-progress" class="reading-progress">
+    <div id="reading-progress-bar" class="reading-progress-bar"></div>
+  </div>
+
+  <!-- 目录导航（桌面端右侧悬浮） -->
+  <nav id="toc-sidebar" class="toc-sidebar" style="display:none;" aria-label="目录">
+    <div class="toc-title">目录</div>
+    <div id="toc-list" class="toc-list"></div>
+  </nav>
+
   <article class="max-w-3xl mx-auto px-6 py-16">
     <div id="article-loading" class="text-center py-20 text-tertiary">
       <div class="animate-pulse">正在加载文章...</div>
@@ -37,7 +48,16 @@ import Layout from '../layouts/Layout.astro';
         </div>
       </header>
 
-      <div id="article-body" class="prose prose-lg max-w-none text-primary leading-relaxed"></div>
+      <!-- 移动端目录折叠按钮 -->
+      <div id="toc-mobile-toggle" class="toc-mobile-toggle md:hidden mb-6">
+        <button id="toc-toggle-btn" class="btn btn-sm btn-secondary w-full justify-between">
+          <span>📑 目录</span>
+          <span id="toc-toggle-icon">▼</span>
+        </button>
+        <div id="toc-mobile-list" class="toc-mobile-list" style="display:none;"></div>
+      </div>
+
+      <div id="article-body" class="prose-custom"></div>
 
       <div class="mt-16 pt-8 border-t border-border flex items-center justify-between">
         <a href="/blog/" class="text-secondary hover:text-accent transition-colors">← 返回目录</a>
@@ -48,7 +68,229 @@ import Layout from '../layouts/Layout.astro';
       </div>
     </div>
   </article>
+
+  <!-- 图片灯箱 -->
+  <div id="lightbox" class="lightbox" style="display:none;" role="dialog" aria-label="图片预览">
+    <div class="lightbox-overlay"></div>
+    <div class="lightbox-content">
+      <img id="lightbox-img" src="" alt="">
+      <div class="lightbox-caption" id="lightbox-caption"></div>
+    </div>
+    <button id="lightbox-close" class="lightbox-btn lightbox-close" aria-label="关闭">×</button>
+    <button id="lightbox-prev" class="lightbox-btn lightbox-prev" aria-label="上一张">‹</button>
+    <button id="lightbox-next" class="lightbox-btn lightbox-next" aria-label="下一张">›</button>
+    <button id="lightbox-download" class="lightbox-btn lightbox-download" aria-label="下载">⬇</button>
+  </div>
 </Layout>
+
+<style>
+  /* 阅读进度条 */
+  .reading-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: transparent;
+    z-index: 1000;
+    pointer-events: none;
+  }
+
+  .reading-progress-bar {
+    height: 100%;
+    width: 0;
+    background: var(--color-accent-primary, #b8977a);
+    transition: width 0.1s linear;
+  }
+
+  /* 目录侧边栏（桌面端） */
+  .toc-sidebar {
+    position: fixed;
+    right: calc((100vw - 48rem) / 2 - 220px);
+    top: 50%;
+    transform: translateY(-50%);
+    width: 200px;
+    max-height: 70vh;
+    overflow-y: auto;
+    padding: 16px;
+    background-color: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    z-index: 100;
+    font-size: 13px;
+  }
+
+  .toc-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-text-tertiary);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .toc-list a {
+    display: block;
+    padding: 6px 0;
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    line-height: 1.5;
+    transition: all 0.3s var(--ease-smooth);
+    border-left: 2px solid transparent;
+    padding-left: 10px;
+    margin-left: -10px;
+  }
+
+  .toc-list a:hover {
+    color: var(--color-accent-primary);
+  }
+
+  .toc-list a.active {
+    color: var(--color-accent-primary);
+    border-left-color: var(--color-accent-primary);
+  }
+
+  .toc-list .toc-h3 {
+    padding-left: 24px;
+    font-size: 12px;
+  }
+
+  /* 移动端目录 */
+  .toc-mobile-toggle {
+    margin-bottom: 24px;
+  }
+
+  .toc-mobile-list {
+    margin-top: 8px;
+    padding: 12px 16px;
+    background-color: var(--color-bg-secondary);
+    border-radius: 6px;
+    font-size: 14px;
+  }
+
+  .toc-mobile-list a {
+    display: block;
+    padding: 6px 0;
+    color: var(--color-text-secondary);
+    text-decoration: none;
+  }
+
+  .toc-mobile-list .toc-h3 {
+    padding-left: 20px;
+    font-size: 13px;
+  }
+
+  /* 图片灯箱 */
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .lightbox-overlay {
+    position: absolute;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(4px);
+  }
+
+  .lightbox-content {
+    position: relative;
+    z-index: 1;
+    max-width: 90vw;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .lightbox-content img {
+    max-width: 90vw;
+    max-height: 80vh;
+    object-fit: contain;
+    border-radius: 4px;
+  }
+
+  .lightbox-caption {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 13px;
+    text-align: center;
+  }
+
+  .lightbox-btn {
+    position: absolute;
+    z-index: 2;
+    width: 44px;
+    height: 44px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.3s var(--ease-smooth);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .lightbox-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .lightbox-close {
+    top: 24px;
+    right: 24px;
+    font-size: 28px;
+  }
+
+  .lightbox-prev {
+    left: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .lightbox-next {
+    right: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .lightbox-download {
+    bottom: 24px;
+    right: 24px;
+    font-size: 18px;
+  }
+
+  /* 响应式 */
+  @media (max-width: 1400px) {
+    .toc-sidebar {
+      right: 24px;
+    }
+  }
+
+  @media (max-width: 1024px) {
+    .toc-sidebar {
+      display: none !important;
+    }
+  }
+
+  /* 文章内图片可点击 */
+  #article-body img {
+    cursor: zoom-in;
+    transition: opacity 0.3s var(--ease-smooth);
+  }
+
+  #article-body img:hover {
+    opacity: 0.9;
+  }
+</style>
 
 <script>
   import { marked } from 'marked';
@@ -69,6 +311,12 @@ import Layout from '../layouts/Layout.astro';
     }
     return { url: urlMeta.content, anonKey: keyMeta.content };
   }
+
+  // 灯箱状态
+  const lightboxState = {
+    images: [] as HTMLImageElement[],
+    currentIndex: 0,
+  };
 
   // 初始化
   async function init() {
@@ -98,6 +346,8 @@ import Layout from '../layouts/Layout.astro';
       }
 
       renderArticle(post, sb);
+      initReadingProgress();
+      initLightbox();
     } catch (err) {
       console.error('加载文章失败:', err);
       showError();
@@ -193,6 +443,17 @@ import Layout from '../layouts/Layout.astro';
       bodyEl.querySelectorAll('pre code').forEach((block: HTMLElement) => {
         hljs.highlightElement(block);
       });
+
+      // 给标题加 id（用于目录锚点跳转）
+      let headingIndex = 0;
+      bodyEl.querySelectorAll('h1, h2, h3').forEach((heading) => {
+        if (!heading.id) {
+          heading.id = 'heading-' + (headingIndex++);
+        }
+      });
+
+      // 生成目录
+      generateToc(bodyEl);
     }
 
     // 点赞数
@@ -223,7 +484,6 @@ import Layout from '../layouts/Layout.astro';
     if (likeBtn) {
       likeBtn.addEventListener('click', async () => {
         if (liked) {
-          // 取消点赞
           const { error } = await sb
             .from('post_likes')
             .delete()
@@ -239,7 +499,6 @@ import Layout from '../layouts/Layout.astro';
             if (likeCountEl) likeCountEl.textContent = String(Math.max(count - 1, 0));
           }
         } else {
-          // 点赞
           const { error } = await sb
             .from('post_likes')
             .insert({
@@ -264,15 +523,239 @@ import Layout from '../layouts/Layout.astro';
     if (!sessionStorage.getItem('viewed_' + slug)) {
       try {
         const result = sb.rpc('increment_view_count', { post_slug: slug });
-        // 兼容 thenable，忽略结果
-        if (result && typeof result.then === 'function') {
-          result.then(() => {}, () => {});
+        if (result && typeof (result as any).then === 'function') {
+          (result as any).then(() => {}, () => {});
         }
       } catch {
         // 忽略浏览量统计错误
       }
       sessionStorage.setItem('viewed_' + slug, '1');
     }
+  }
+
+  // ============================
+  // 目录导航
+  // ============================
+  function generateToc(bodyEl: HTMLElement) {
+    const headings = bodyEl.querySelectorAll('h2, h3');
+    if (headings.length === 0) return;
+
+    const tocSidebar = document.getElementById('toc-sidebar');
+    const tocList = document.getElementById('toc-list');
+    const tocMobileList = document.getElementById('toc-mobile-list');
+    const tocMobileToggle = document.getElementById('toc-mobile-toggle');
+
+    if (!tocList) return;
+
+    // 生成目录项
+    const items: { id: string; text: string; level: number }[] = [];
+    headings.forEach((heading) => {
+      const level = heading.tagName === 'H2' ? 2 : 3;
+      items.push({
+        id: heading.id,
+        text: heading.textContent || '',
+        level,
+      });
+    });
+
+    // 渲染桌面端目录
+    if (tocSidebar && tocList) {
+      items.forEach((item) => {
+        const a = document.createElement('a');
+        a.href = '#' + item.id;
+        a.textContent = item.text;
+        a.className = 'toc-h' + item.level;
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          const el = document.getElementById(item.id);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
+        tocList.appendChild(a);
+      });
+      tocSidebar.style.display = 'block';
+    }
+
+    // 渲染移动端目录
+    if (tocMobileList) {
+      items.forEach((item) => {
+        const a = document.createElement('a');
+        a.href = '#' + item.id;
+        a.textContent = item.text;
+        a.className = 'toc-h' + item.level;
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          const el = document.getElementById(item.id);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+          // 关闭移动端目录
+          tocMobileList.style.display = 'none';
+          const icon = document.getElementById('toc-toggle-icon');
+          if (icon) icon.textContent = '▼';
+        });
+        tocMobileList.appendChild(a);
+      });
+    }
+
+    // 移动端目录折叠/展开
+    const toggleBtn = document.getElementById('toc-toggle-btn');
+    if (toggleBtn && tocMobileList && tocMobileToggle) {
+      toggleBtn.addEventListener('click', () => {
+        const isOpen = tocMobileList.style.display === 'block';
+        tocMobileList.style.display = isOpen ? 'none' : 'block';
+        const icon = document.getElementById('toc-toggle-icon');
+        if (icon) icon.textContent = isOpen ? '▼' : '▲';
+      });
+    }
+
+    // 滚动时高亮当前章节
+    initTocHighlight(items);
+  }
+
+  function initTocHighlight(items: { id: string; text: string; level: number }[]) {
+    function updateActiveToc() {
+      let currentId = items[0]?.id || '';
+      for (const item of items) {
+        const el = document.getElementById(item.id);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          if (rect.top <= 120) {
+            currentId = item.id;
+          }
+        }
+      }
+
+      // 更新桌面端目录高亮
+      document.querySelectorAll('.toc-list a').forEach((a) => {
+        a.classList.remove('active');
+        if (a.getAttribute('href') === '#' + currentId) {
+          a.classList.add('active');
+        }
+      });
+    }
+
+    window.addEventListener('scroll', updateActiveToc, { passive: true });
+    updateActiveToc();
+  }
+
+  // ============================
+  // 阅读进度条
+  // ============================
+  function initReadingProgress() {
+    const progressBar = document.getElementById('reading-progress-bar');
+    if (!progressBar) return;
+
+    function updateProgress() {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const progress = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+      progressBar.style.width = progress + '%';
+    }
+
+    window.addEventListener('scroll', updateProgress, { passive: true });
+    updateProgress();
+  }
+
+  // ============================
+  // 图片灯箱
+  // ============================
+  function initLightbox() {
+    const bodyEl = document.getElementById('article-body');
+    if (!bodyEl) return;
+
+    const images = Array.from(bodyEl.querySelectorAll('img'));
+    if (images.length === 0) return;
+
+    lightboxState.images = images as HTMLImageElement[];
+
+    images.forEach((img, index) => {
+      img.style.cursor = 'zoom-in';
+      img.addEventListener('click', () => {
+        openLightbox(index);
+      });
+    });
+
+    // 关闭按钮
+    const closeBtn = document.getElementById('lightbox-close');
+    const overlay = document.querySelector('.lightbox-overlay');
+    if (closeBtn) closeBtn.addEventListener('click', closeLightbox);
+    if (overlay) overlay.addEventListener('click', closeLightbox);
+
+    // 上一张/下一张
+    const prevBtn = document.getElementById('lightbox-prev');
+    const nextBtn = document.getElementById('lightbox-next');
+    if (prevBtn) prevBtn.addEventListener('click', () => navigateLightbox(-1));
+    if (nextBtn) nextBtn.addEventListener('click', () => navigateLightbox(1));
+
+    // 下载按钮
+    const downloadBtn = document.getElementById('lightbox-download');
+    if (downloadBtn) downloadBtn.addEventListener('click', downloadImage);
+
+    // 键盘操作
+    document.addEventListener('keydown', (e) => {
+      const lightbox = document.getElementById('lightbox');
+      if (!lightbox || lightbox.style.display === 'none') return;
+
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowLeft') navigateLightbox(-1);
+      if (e.key === 'ArrowRight') navigateLightbox(1);
+    });
+  }
+
+  function openLightbox(index: number) {
+    const lightbox = document.getElementById('lightbox');
+    const img = document.getElementById('lightbox-img') as HTMLImageElement;
+    const caption = document.getElementById('lightbox-caption');
+    if (!lightbox || !img) return;
+
+    lightboxState.currentIndex = index;
+    const currentImg = lightboxState.images[index];
+    img.src = currentImg.src;
+    img.alt = currentImg.alt;
+    if (caption) caption.textContent = currentImg.alt || '';
+
+    lightbox.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+
+    // 隐藏/显示上下张按钮（单张时）
+    const prevBtn = document.getElementById('lightbox-prev');
+    const nextBtn = document.getElementById('lightbox-next');
+    if (prevBtn) prevBtn.style.display = lightboxState.images.length > 1 ? 'flex' : 'none';
+    if (nextBtn) nextBtn.style.display = lightboxState.images.length > 1 ? 'flex' : 'none';
+  }
+
+  function closeLightbox() {
+    const lightbox = document.getElementById('lightbox');
+    if (!lightbox) return;
+    lightbox.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+
+  function navigateLightbox(direction: number) {
+    const total = lightboxState.images.length;
+    if (total <= 1) return;
+
+    let newIndex = lightboxState.currentIndex + direction;
+    if (newIndex < 0) newIndex = total - 1;
+    if (newIndex >= total) newIndex = 0;
+
+    openLightbox(newIndex);
+  }
+
+  function downloadImage() {
+    const img = document.getElementById('lightbox-img') as HTMLImageElement;
+    if (!img || !img.src) return;
+
+    const a = document.createElement('a');
+    a.href = img.src;
+    a.download = img.alt || 'image';
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   }
 
   function getVisitorId(): string {

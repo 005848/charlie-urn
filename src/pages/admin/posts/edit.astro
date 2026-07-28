@@ -124,24 +124,55 @@ import { CATEGORIES } from '../../../consts';
         <div>
           <div class="flex items-center justify-between mb-2">
             <label for="content" class="block text-sm text-[#6b6864]">正文 (Markdown)</label>
-            <div class="flex gap-2">
-              <label class="cursor-pointer px-3 py-1.5 text-xs bg-[#f0eeeb] hover:bg-[#e5e2dd] text-[#6b6864] rounded-md transition-colors flex items-center gap-1">
-                <span>🖼️</span> 插入图片
+          </div>
+
+          <!-- Markdown 工具栏 -->
+          <div class="editor-toolbar" id="editor-toolbar">
+            <div class="toolbar-group">
+              <button type="button" data-action="bold" title="加粗 (Ctrl+B)" class="toolbar-btn"><b>B</b></button>
+              <button type="button" data-action="italic" title="斜体 (Ctrl+I)" class="toolbar-btn"><i>I</i></button>
+              <button type="button" data-action="strikethrough" title="删除线" class="toolbar-btn"><s>S</s></button>
+            </div>
+            <div class="toolbar-divider"></div>
+            <div class="toolbar-group">
+              <button type="button" data-action="heading1" title="标题1" class="toolbar-btn">H1</button>
+              <button type="button" data-action="heading2" title="标题2" class="toolbar-btn">H2</button>
+              <button type="button" data-action="heading3" title="标题3" class="toolbar-btn">H3</button>
+            </div>
+            <div class="toolbar-divider"></div>
+            <div class="toolbar-group">
+              <button type="button" data-action="quote" title="引用" class="toolbar-btn">❝</button>
+              <button type="button" data-action="code" title="行内代码" class="toolbar-btn">&lt;/&gt;</button>
+              <button type="button" data-action="codeblock" title="代码块" class="toolbar-btn">{ }</button>
+            </div>
+            <div class="toolbar-divider"></div>
+            <div class="toolbar-group">
+              <button type="button" data-action="link" title="链接 (Ctrl+K)" class="toolbar-btn">🔗</button>
+              <label class="toolbar-btn cursor-pointer" title="插入图片">
+                🖼️
                 <input type="file" accept="image/*" class="hidden" id="upload-image" multiple />
               </label>
-              <label class="cursor-pointer px-3 py-1.5 text-xs bg-[#f0eeeb] hover:bg-[#e5e2dd] text-[#6b6864] rounded-md transition-colors flex items-center gap-1">
-                <span>🎬</span> 插入视频
+              <label class="toolbar-btn cursor-pointer" title="插入视频">
+                🎬
                 <input type="file" accept="video/*" class="hidden" id="upload-video" />
               </label>
-              <label class="cursor-pointer px-3 py-1.5 text-xs bg-[#f0eeeb] hover:bg-[#e5e2dd] text-[#6b6864] rounded-md transition-colors flex items-center gap-1">
-                <span>🎵</span> 插入音频
+              <label class="toolbar-btn cursor-pointer" title="插入音频">
+                🎵
                 <input type="file" accept="audio/*" class="hidden" id="upload-audio" />
               </label>
-              <button type="button" id="insert-code-btn" class="px-3 py-1.5 text-xs bg-[#f0eeeb] hover:bg-[#e5e2dd] text-[#6b6864] rounded-md transition-colors flex items-center gap-1">
-                <span>💻</span> 插入代码
-              </button>
+            </div>
+            <div class="toolbar-divider"></div>
+            <div class="toolbar-group">
+              <button type="button" data-action="ul" title="无序列表" class="toolbar-btn">• 列表</button>
+              <button type="button" data-action="ol" title="有序列表" class="toolbar-btn">1. 列表</button>
+            </div>
+            <div class="toolbar-divider"></div>
+            <div class="toolbar-group">
+              <button type="button" data-action="hr" title="分割线" class="toolbar-btn">—</button>
+              <button type="button" data-action="table" title="表格" class="toolbar-btn">▦</button>
             </div>
           </div>
+
           <textarea
             id="content"
             rows="20"
@@ -209,6 +240,65 @@ import { CATEGORIES } from '../../../consts';
       </form>
     </div>
   </div>
+
+  <style>
+    .editor-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 12px;
+      background: var(--color-bg-secondary);
+      border: 1px solid var(--color-border);
+      border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      flex-wrap: wrap;
+    }
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .toolbar-divider {
+      width: 1px;
+      height: 20px;
+      background: var(--color-border);
+      margin: 0 4px;
+    }
+    .toolbar-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 32px;
+      height: 32px;
+      padding: 0 8px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--color-text-secondary);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+    .toolbar-btn:hover {
+      background: var(--color-bg-primary);
+      color: var(--color-text-primary);
+      border-color: var(--color-border);
+    }
+    .toolbar-btn:active {
+      background: var(--color-accent);
+      color: #fff;
+      border-color: var(--color-accent);
+    }
+    .toolbar-btn b, .toolbar-btn i, .toolbar-btn s {
+      pointer-events: none;
+    }
+    #content {
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
+    }
+  </style>
 
   <script>
     import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -522,10 +612,10 @@ import { CATEGORIES } from '../../../consts';
     });
 
     // --- Markdown 工具栏 ---
-    const toolbar = document.getElementById('md-toolbar');
+    const toolbar = document.getElementById('editor-toolbar');
     const textarea = document.getElementById('content') as HTMLTextAreaElement;
 
-    function insertMarkdown(prefix: string, suffix = '', placeholder = '') {
+    function insertAround(prefix: string, suffix = '', placeholder = '') {
       const start = textarea.selectionStart;
       const end = textarea.selectionEnd;
       const selected = textarea.value.substring(start, end) || placeholder;
@@ -535,32 +625,86 @@ import { CATEGORIES } from '../../../consts';
       textarea.focus();
       textarea.selectionStart = start + prefix.length;
       textarea.selectionEnd = start + prefix.length + selected.length;
+      textarea.dispatchEvent(new Event('input'));
     }
 
-    const toolbarBtns: Record<string, () => void> = {
-      'bold': () => insertMarkdown('**', '**', '粗体文字'),
-      'italic': () => insertMarkdown('*', '*', '斜体文字'),
-      'h2': () => insertMarkdown('\n## ', '\n', '二级标题'),
-      'h3': () => insertMarkdown('\n### ', '\n', '三级标题'),
-      'link': () => insertMarkdown('[', '](https://)', '链接文字'),
-      'quote': () => insertMarkdown('\n> ', '\n', '引用内容'),
-      'code': () => insertMarkdown('\n```javascript\n', '\n```\n', '// 代码'),
-      'list': () => insertMarkdown('\n- ', '\n', '列表项'),
-      'hr': () => insertMarkdown('\n\n---\n\n', '', ''),
+    function insertLineBefore(prefix: string, placeholder = '') {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const value = textarea.value;
+      // 找到当前行开头
+      let lineStart = start;
+      while (lineStart > 0 && value[lineStart - 1] !== '\n') lineStart--;
+      const selected = value.substring(lineStart, end) || placeholder;
+      const before = value.substring(0, lineStart);
+      const after = value.substring(end, value.length);
+      const newText = prefix + selected;
+      textarea.value = before + newText + after;
+      textarea.focus();
+      textarea.selectionStart = lineStart + prefix.length;
+      textarea.selectionEnd = lineStart + prefix.length + selected.length;
+      textarea.dispatchEvent(new Event('input'));
+    }
+
+    function insertBlock(block: string) {
+      const start = textarea.selectionStart;
+      const before = textarea.value.substring(0, start);
+      const after = textarea.value.substring(textarea.selectionEnd, textarea.value.length);
+      // 确保前后有空行
+      const prefixBefore = before && !before.endsWith('\n\n') ? (before.endsWith('\n') ? '\n' : '\n\n') : '';
+      const prefixAfter = after && !after.startsWith('\n\n') ? (after.startsWith('\n') ? '\n' : '\n\n') : '';
+      textarea.value = before + prefixBefore + block + prefixAfter + after;
+      const pos = start + prefixBefore.length + block.length;
+      textarea.focus();
+      textarea.selectionStart = pos;
+      textarea.selectionEnd = pos;
+      textarea.dispatchEvent(new Event('input'));
+    }
+
+    const toolbarActions: Record<string, () => void> = {
+      'bold': () => insertAround('**', '**', '粗体文字'),
+      'italic': () => insertAround('*', '*', '斜体文字'),
+      'strikethrough': () => insertAround('~~', '~~', '删除线文字'),
+      'heading1': () => insertLineBefore('# ', '一级标题'),
+      'heading2': () => insertLineBefore('## ', '二级标题'),
+      'heading3': () => insertLineBefore('### ', '三级标题'),
+      'quote': () => insertLineBefore('> ', '引用内容'),
+      'code': () => insertAround('`', '`', 'code'),
+      'codeblock': () => insertBlock('```javascript\n// 代码\n```'),
+      'link': () => {
+        const url = prompt('请输入链接地址：', 'https://') || 'https://';
+        insertAround('[', '](' + url + ')', '链接文字');
+      },
+      'ul': () => insertLineBefore('- ', '列表项'),
+      'ol': () => insertLineBefore('1. ', '列表项'),
+      'hr': () => insertBlock('---'),
+      'table': () => insertBlock('| 列1 | 列2 | 列3 |\n| --- | --- | --- |\n| 内容 | 内容 | 内容 |'),
     };
 
     if (toolbar) {
       toolbar.querySelectorAll('button[data-action]').forEach(btn => {
         btn.addEventListener('click', () => {
           const action = (btn as HTMLButtonElement).dataset.action;
-          if (action && toolbarBtns[action]) {
-            toolbarBtns[action]();
-            // 触发预览更新
-            textarea.dispatchEvent(new Event('input'));
+          if (action && toolbarActions[action]) {
+            toolbarActions[action]();
           }
         });
       });
     }
+
+    // 快捷键支持
+    textarea.addEventListener('keydown', (e) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const key = e.key.toLowerCase();
+      let action = '';
+      if (key === 'b') action = 'bold';
+      else if (key === 'i') action = 'italic';
+      else if (key === 'k') action = 'link';
+      if (action && toolbarActions[action]) {
+        e.preventDefault();
+        toolbarActions[action]();
+      }
+    });
 
     // --- 草稿自动保存 ---
     const DRAFT_KEY = 'charlie_post_draft';

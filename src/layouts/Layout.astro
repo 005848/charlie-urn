@@ -3,6 +3,7 @@ import '../styles/global.css';
 import BaseHead from '../components/BaseHead.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import Toast from '../components/Toast.astro';
 
 interface Props {
   title?: string;
@@ -33,6 +34,7 @@ const { title, description } = Astro.props;
       <slot />
     </main>
     <Footer />
+    <Toast />
   </body>
 </html>
 

@@ -129,6 +129,60 @@ import { CATEGORIES } from '../../consts';
     loadMoreBtn.disabled = true;
 
     try {
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      // 有搜索词时优先使用全文搜索 RPC
+      if (currentSearch) {
+        try {
+          const { data: searchResults, error: searchError } = await sb
+            .rpc('search_blog_posts', {
+              search_term: currentSearch,
+              page_limit: pageSize,
+              page_offset: from,
+              category_filter: currentCategory === 'all' ? null : currentCategory
+            });
+
+          if (!searchError && Array.isArray(searchResults)) {
+            totalPosts = searchResults.length > 0 ? searchResults[0].total_count : 0;
+            const posts = searchResults.map(r => ({
+              id: r.id,
+              slug: r.slug,
+              title: r.title,
+              description: r.description,
+              category: r.category,
+              pub_date: r.pub_date,
+              tags: r.tags,
+            }));
+
+            allPosts = reset ? posts : [...allPosts, ...posts];
+            postCountEl.textContent = String(totalPosts);
+
+            if (allPosts.length === 0) {
+              postsContainer.style.display = 'none';
+              document.getElementById('timelineView')!.style.display = 'none';
+              noResults.style.display = 'block';
+              loadMoreContainer.style.display = 'none';
+            } else {
+              noResults.style.display = 'none';
+              renderListView();
+              renderTimelineView();
+
+              const hasMore = allPosts.length < totalPosts;
+              loadMoreContainer.style.display = hasMore ? 'block' : 'none';
+              loadMoreBtn.textContent = '加载更多';
+              loadMoreBtn.disabled = !hasMore;
+            }
+            loading = false;
+            return;
+          }
+          // RPC 失败时降级到 ilike 搜索
+          console.warn('全文搜索 RPC 不可用，降级到 ilike 搜索');
+        } catch (rpcErr) {
+          console.warn('全文搜索 RPC 调用失败，降级到 ilike 搜索:', rpcErr);
+        }
+      }
+
       let query = sb
         .from('blog_posts')
         .select('id, slug, title, description, category, pub_date, tags', { count: 'exact' })
@@ -141,9 +195,6 @@ import { CATEGORIES } from '../../consts';
       if (currentSearch) {
         query = query.or(`title.ilike.%${currentSearch}%,description.ilike.%${currentSearch}%`);
       }
-
-      const from = (currentPage - 1) * pageSize;
-      const to = from + pageSize - 1;
 
       const { data: posts, error, count } = await query
         .order('pub_date', { ascending: false })
@@ -219,8 +270,8 @@ import { CATEGORIES } from '../../consts';
           <span class="post-card-category">${catLabel}</span>
           <span class="post-card-date">${dateStr}</span>
         </div>
-        <h3 class="post-card-title">${escapeHtml(post.title)}</h3>
-        <p class="post-card-excerpt">${escapeHtml(post.description || '')}</p>
+        <h3 class="post-card-title">${highlightText(post.title)}</h3>
+        <p class="post-card-excerpt">${highlightText(post.description || '')}</p>
         ${tagsHtml ? `<div class="post-card-tags">${tagsHtml}</div>` : ''}
         <div class="post-card-footer">
           <span class="read-more">阅读全文 →</span>
@@ -242,7 +293,7 @@ import { CATEGORIES } from '../../consts';
               <span class="timeline-date">
                 ${date.getMonth() + 1}月${date.getDate()}日
               </span>
-              <span class="timeline-title">${escapeHtml(post.title)}</span>
+              <span class="timeline-title">${highlightText(post.title)}</span>
             </a>
           </div>
         </div>
@@ -300,6 +351,15 @@ import { CATEGORIES } from '../../consts';
     currentPage++;
     loadPosts(false);
   });
+
+  // 关键词高亮
+  function highlightText(text: string): string {
+    if (!currentSearch || !text) return escapeHtml(text);
+    const safeText = escapeHtml(text);
+    const escapedSearch = currentSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escapedSearch})`, 'gi');
+    return safeText.replace(regex, '<mark class="search-highlight">$1</mark>');
+  }
 
   // URL 参数初始化
   const urlParams = new URLSearchParams(window.location.search);
@@ -770,5 +830,17 @@ import { CATEGORIES } from '../../consts';
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* 搜索高亮 */
+.search-highlight {
+  background: linear-gradient(120deg, #d4c4b0 0%, #d4c4b0 100%);
+  background-repeat: no-repeat;
+  background-size: 100% 40%;
+  background-position: 0 90%;
+  color: #2c2a28;
+  font-weight: 500;
+  padding: 0 2px;
+  border-radius: 2px;
 }
 </style>

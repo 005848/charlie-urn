@@ -1,0 +1,45 @@
+---
+// Toast 全局提示组件
+// 使用方式：window.toast.success('操作成功') / window.toast.error('错误信息') / window.toast.info('提示')
+---
+
+<div id="toast-container" class="toast-container"></div>
+
+<script is:inline>
+  (function() {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    function show(message, type, duration) {
+      type = type || 'info';
+      duration = duration || 3000;
+
+      const toast = document.createElement('div');
+      toast.className = 'toast toast-' + type;
+      toast.textContent = message;
+      container.appendChild(toast);
+
+      // 触发动画
+      requestAnimationFrame(function() {
+        toast.classList.add('show');
+      });
+
+      // 自动消失
+      setTimeout(function() {
+        toast.classList.remove('show');
+        setTimeout(function() {
+          if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+          }
+        }, 400);
+      }, duration);
+    }
+
+    window.toast = {
+      success: function(msg, duration) { show(msg, 'success', duration); },
+      error: function(msg, duration) { show(msg, 'error', duration); },
+      warning: function(msg, duration) { show(msg, 'warning', duration); },
+      info: function(msg, duration) { show(msg, 'info', duration); }
+    };
+  })();
+</script>

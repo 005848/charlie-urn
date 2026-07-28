@@ -42,13 +42,64 @@ import Layout from '../../layouts/Layout.astro';
         <span id="file-count" class="text-sm text-[#9a9690]">加载中...</span>
       </div>
 
-      <div id="media-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <!-- 筛选 + 搜索 -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div class="flex items-center gap-2 flex-wrap">
+          <button data-filter="all" class="filter-btn active px-3 py-1.5 text-sm rounded-lg border transition-all">全部</button>
+          <button data-filter="image" class="filter-btn px-3 py-1.5 text-sm rounded-lg border transition-all">图片</button>
+          <button data-filter="video" class="filter-btn px-3 py-1.5 text-sm rounded-lg border transition-all">视频</button>
+          <button data-filter="audio" class="filter-btn px-3 py-1.5 text-sm rounded-lg border transition-all">音频</button>
+        </div>
+        <div class="relative">
+          <input type="text" id="media-search" placeholder="搜索文件名..." class="pl-9 pr-4 py-1.5 text-sm border rounded-lg w-full sm:w-56 focus:outline-none focus:ring-2 focus:ring-[#b8977a]/30" />
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#9a9690]">🔍</span>
+        </div>
+      </div>
+
+      <div id="media-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         <div class="col-span-full text-center py-12 text-[#9a9690]">
           加载中...
         </div>
       </div>
+
+      <!-- 图片预览灯箱 -->
+      <div id="media-lightbox" class="fixed inset-0 bg-black/80 z-50 hidden items-center justify-center p-4" onclick="closeMediaLightbox()">
+        <button onclick="closeMediaLightbox()" class="absolute top-4 right-4 text-white text-2xl w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors">×</button>
+        <button id="lightbox-prev" class="absolute left-4 top-1/2 -translate-y-1/2 text-white text-3xl w-12 h-12 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors">‹</button>
+        <button id="lightbox-next" class="absolute right-4 top-1/2 -translate-y-1/2 text-white text-3xl w-12 h-12 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors">›</button>
+        <img id="lightbox-img" class="max-w-full max-h-[85vh] object-contain rounded-lg" onclick="event.stopPropagation()" />
+        <div class="absolute bottom-6 left-1/2 -translate-x-1/2 text-white text-sm bg-black/50 px-4 py-2 rounded-full">
+          <span id="lightbox-name"></span>
+          <button onclick="downloadLightboxImage()" class="ml-4 px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full transition-colors">下载</button>
+        </div>
+      </div>
     </div>
   </div>
+
+  <style>
+    .filter-btn {
+      border-color: var(--color-border);
+      background: var(--color-bg-primary);
+      color: var(--color-text-secondary);
+    }
+    .filter-btn:hover {
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+    }
+    .filter-btn.active {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: #fff;
+    }
+    #media-search {
+      background: var(--color-bg-primary);
+      border-color: var(--color-border);
+      color: var(--color-text-primary);
+    }
+    #media-search:focus {
+      border-color: var(--color-accent);
+    }
+  </style>
 
   <script>
     import { getSupabase, uploadFile, listMediaFiles, deleteMediaFile, getFileType, getPublicUrl } from '../../lib/supabase/client';
@@ -67,6 +118,200 @@ import Layout from '../../layouts/Layout.astro';
 
     checkAuth().then(isAdmin => {
       if (isAdmin) loadMedia();
+    });
+
+    // 筛选和搜索状态
+    let allFiles: any[] = [];
+    let currentFilter = 'all';
+    let searchQuery = '';
+
+    // 筛选按钮
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFilter = btn.getAttribute('data-filter') || 'all';
+        renderFiles();
+      });
+    });
+
+    // 搜索输入
+    document.getElementById('media-search')?.addEventListener('input', (e) => {
+      searchQuery = (e.target as HTMLInputElement).value.toLowerCase();
+      renderFiles();
+    });
+
+    function getFileType(name: string): string {
+      if (/\.(jpg|jpeg|png|gif|webp|svg)$/i.test(name)) return 'image';
+      if (/\.(mp4|webm|ogg|mov)$/i.test(name)) return 'video';
+      if (/\.(mp3|wav|ogg|m4a|flac)$/i.test(name)) return 'audio';
+      return 'other';
+    }
+
+    function renderFiles() {
+      const gridEl = document.getElementById('media-grid');
+      const countEl = document.getElementById('file-count');
+      if (!gridEl) return;
+
+      let files = allFiles.filter(f => f.name !== '.emptyFolderPlaceholder');
+
+      // 类型筛选
+      if (currentFilter !== 'all') {
+        files = files.filter(f => getFileType(f.name) === currentFilter);
+      }
+
+      // 搜索筛选
+      if (searchQuery) {
+        files = files.filter(f => f.name.toLowerCase().includes(searchQuery));
+      }
+
+      if (countEl) countEl.textContent = `共 ${files.length} 个文件`;
+
+      if (files.length === 0) {
+        gridEl.innerHTML = `
+          <div class="col-span-full text-center py-12 text-[#9a9690]">
+            ${allFiles.length === 0 ? '还没有上传任何文件' : '没有找到匹配的文件'}
+          </div>
+        `;
+        return;
+      }
+
+      gridEl.innerHTML = files.map((file, idx) => {
+        const url = getPublicUrl(file.name);
+        const type = getFileType(file.name);
+
+        let preview = '';
+        if (type === 'image') {
+          preview = `<img src="${url}" alt="${file.name}" class="w-full h-40 object-cover cursor-zoom-in transition-transform group-hover:scale-105" onclick="openMediaLightbox(${idx}, event)" />`;
+        } else if (type === 'video') {
+          preview = `<div class="w-full h-40 bg-gradient-to-br from-[#f0eeeb] to-[#e5e2dd] flex flex-col items-center justify-center cursor-pointer hover:from-[#e5e2dd] hover:to-[#d4c4b0] transition-all" onclick="openMediaLightbox(${idx}, event)">
+            <span class="text-3xl">🎬</span>
+            <span class="text-xs text-[#6b6864] mt-1">点击预览</span>
+          </div>`;
+        } else if (type === 'audio') {
+          preview = `<div class="w-full h-40 bg-gradient-to-br from-[#f0eeeb] to-[#e5e2dd] flex flex-col items-center justify-center">
+            <span class="text-3xl">🎵</span>
+            <span class="text-xs text-[#6b6864] mt-1">音频文件</span>
+          </div>`;
+        } else {
+          preview = `<div class="w-full h-40 bg-[#f0eeeb] flex items-center justify-center text-3xl">📄</div>`;
+        }
+
+        const sizeKB = file.metadata?.size ? (file.metadata.size / 1024).toFixed(1) : '?';
+        const unit = sizeKB === '?' ? 'KB' : (parseFloat(sizeKB as string) > 1024 ? (parseFloat(sizeKB as string) / 1024).toFixed(1) + ' MB' : sizeKB + ' KB');
+
+        return `
+          <div class="bg-white border border-[#e5e2dd] rounded-lg overflow-hidden group hover:shadow-md hover:border-[#d4c4b0] transition-all">
+            <div class="relative overflow-hidden">${preview}
+              <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+            </div>
+            <div class="p-3">
+              <p class="text-xs text-[#2c2a28] truncate font-medium" title="${file.name}">${file.name.split('/').pop()}</p>
+              <p class="text-xs text-[#9a9690] mt-1">${unit}</p>
+              <div class="flex gap-2 mt-3">
+                <button 
+                  onclick="copyUrl('${url}')"
+                  class="flex-1 text-xs py-1.5 bg-[#f0eeeb] hover:bg-[#e5e2dd] text-[#6b6864] rounded transition-colors"
+                >复制链接</button>
+                <button 
+                  onclick="deleteFile('${file.name}')"
+                  class="flex-1 text-xs py-1.5 bg-red-50 hover:bg-red-100 text-red-500 rounded transition-colors"
+                >删除</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 灯箱功能
+    let currentLightboxIndex = 0;
+    let currentFiles: any[] = [];
+
+    (window as any).openMediaLightbox = function(idx: number, e: Event) {
+      e.stopPropagation();
+      // 重新计算当前筛选后的文件列表（仅图片+视频）
+      currentFiles = allFiles.filter(f => {
+        if (f.name === '.emptyFolderPlaceholder') return false;
+        const type = getFileType(f.name);
+        return type === 'image' || type === 'video';
+      });
+
+      // 找到在当前显示列表中的真实索引
+      const displayFiles = allFiles
+        .filter(f => f.name !== '.emptyFolderPlaceholder')
+        .filter(f => currentFilter === 'all' || getFileType(f.name) === currentFilter)
+        .filter(f => !searchQuery || f.name.toLowerCase().includes(searchQuery));
+
+      const targetFile = displayFiles[idx];
+      currentLightboxIndex = currentFiles.findIndex(f => f.name === targetFile.name);
+      if (currentLightboxIndex < 0) currentLightboxIndex = 0;
+
+      showLightboxItem();
+      const lb = document.getElementById('media-lightbox');
+      if (lb) {
+        lb.classList.remove('hidden');
+        lb.classList.add('flex');
+      }
+    };
+
+    function showLightboxItem() {
+      const file = currentFiles[currentLightboxIndex];
+      if (!file) return;
+      const url = getPublicUrl(file.name);
+      const type = getFileType(file.name);
+      const imgEl = document.getElementById('lightbox-img') as HTMLImageElement;
+      const nameEl = document.getElementById('lightbox-name');
+
+      if (type === 'image') {
+        imgEl.style.display = 'block';
+        imgEl.src = url;
+        imgEl.alt = file.name;
+      }
+      if (nameEl) nameEl.textContent = file.name.split('/').pop();
+    }
+
+    (window as any).closeMediaLightbox = function() {
+      const lb = document.getElementById('media-lightbox');
+      if (lb) {
+        lb.classList.add('hidden');
+        lb.classList.remove('flex');
+      }
+    };
+
+    (window as any).downloadLightboxImage = function() {
+      const file = currentFiles[currentLightboxIndex];
+      if (!file) return;
+      const url = getPublicUrl(file.name);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name.split('/').pop();
+      a.target = '_blank';
+      a.click();
+    };
+
+    // 灯箱左右切换
+    document.getElementById('lightbox-prev')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (currentFiles.length === 0) return;
+      currentLightboxIndex = (currentLightboxIndex - 1 + currentFiles.length) % currentFiles.length;
+      showLightboxItem();
+    });
+
+    document.getElementById('lightbox-next')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (currentFiles.length === 0) return;
+      currentLightboxIndex = (currentLightboxIndex + 1) % currentFiles.length;
+      showLightboxItem();
+    });
+
+    // 键盘操作
+    document.addEventListener('keydown', (e) => {
+      const lb = document.getElementById('media-lightbox');
+      if (!lb || lb.classList.contains('hidden')) return;
+      if (e.key === 'Escape') (window as any).closeMediaLightbox();
+      if (e.key === 'ArrowLeft') document.getElementById('lightbox-prev')?.click();
+      if (e.key === 'ArrowRight') document.getElementById('lightbox-next')?.click();
     });
 
     // 上传图片
@@ -130,64 +375,8 @@ import Layout from '../../layouts/Layout.astro';
 
         if (error) throw error;
 
-        const files = data?.filter(f => f.name !== '.emptyFolderPlaceholder') || [];
-
-        if (countEl) countEl.textContent = `共 ${files.length} 个文件`;
-
-        if (!gridEl) return;
-
-        if (files.length === 0) {
-          gridEl.innerHTML = `
-            <div class="col-span-full text-center py-12 text-[#9a9690]">
-              还没有上传任何文件
-            </div>
-          `;
-          return;
-        }
-
-        gridEl.innerHTML = files.map(file => {
-          const url = getPublicUrl(file.name);
-          const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name);
-          const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(file.name);
-          const isAudio = /\.(mp3|wav|ogg|m4a|webm)$/i.test(file.name);
-
-          let preview = '';
-          let icon = '📁';
-          if (isImage) {
-            preview = `<img src="${url}" alt="${file.name}" class="w-full h-32 object-cover" />`;
-            icon = '🖼️';
-          } else if (isVideo) {
-            preview = `<div class="w-full h-32 bg-[#f0eeeb] flex items-center justify-center text-3xl">🎬</div>`;
-            icon = '🎬';
-          } else if (isAudio) {
-            preview = `<div class="w-full h-32 bg-[#f0eeeb] flex items-center justify-center text-3xl">🎵</div>`;
-            icon = '🎵';
-          } else {
-            preview = `<div class="w-full h-32 bg-[#f0eeeb] flex items-center justify-center text-3xl">📄</div>`;
-          }
-
-          const sizeKB = (file.metadata?.size / 1024).toFixed(1);
-
-          return `
-            <div class="bg-white border border-[#e5e2dd] rounded-lg overflow-hidden group">
-              ${preview}
-              <div class="p-3">
-                <p class="text-xs text-[#2c2a28] truncate" title="${file.name}">${file.name}</p>
-                <p class="text-xs text-[#9a9690] mt-1">${sizeKB} KB</p>
-                <div class="flex gap-2 mt-2">
-                  <button 
-                    onclick="copyUrl('${url}')"
-                    class="flex-1 text-xs py-1 bg-[#f0eeeb] hover:bg-[#e5e2dd] text-[#6b6864] rounded transition-colors"
-                  >复制链接</button>
-                  <button 
-                    onclick="deleteFile('${file.name}')"
-                    class="flex-1 text-xs py-1 bg-red-50 hover:bg-red-100 text-red-500 rounded transition-colors"
-                  >删除</button>
-                </div>
-              </div>
-            </div>
-          `;
-        }).join('');
+        allFiles = data || [];
+        renderFiles();
 
       } catch (err) {
         console.error('加载媒体失败:', err);
