@@ -198,7 +198,7 @@ const latestPosts: any[] = [];
           container.innerHTML = `<p class="text-center text-[#9a9690] text-sm col-span-full py-12">暂无文章</p>`;
         } else {
           container.innerHTML = posts.map((post: any) => `
-            <a href="/blog/view?slug=${post.slug}" class="post-card animate-fade-in-up">
+            <a href="/blog/view/?slug=${post.slug}" class="post-card animate-fade-in-up">
               <div class="post-card-meta">
                 <span class="post-card-category">${categoryLabels[post.category] || post.category}</span>
                 <span class="post-card-date">${formatDate(post.pub_date)}</span>
