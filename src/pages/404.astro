@@ -1,0 +1,305 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="页面不存在" description="您访问的页面不存在">
+  <!-- 404 页面（静态部分） -->
+  <div id="not-found-container" class="not-found-page">
+    <div class="not-found-inner">
+      <div class="not-found-icon">◇</div>
+      <h1 class="not-found-title">404</h1>
+      <p class="not-found-desc">您访问的页面不存在</p>
+      <a href="/" class="back-home-btn">返回首页</a>
+    </div>
+  </div>
+
+  <!-- 文章动态加载容器（用于 /blog/xxx 的 fallback） -->
+  <article id="dynamic-article" class="article-page" style="display: none;">
+    <div id="article-loading" class="article-loading">
+      <div class="loading-text">加载中...</div>
+    </div>
+    <div id="article-content-wrap" style="display: none;">
+      <div id="article-cover-wrap" class="article-cover" style="display: none;">
+        <img id="article-cover-img" alt="" />
+        <div class="cover-overlay"></div>
+      </div>
+      <header class="article-header">
+        <div class="header-inner">
+          <a href="/blog" class="back-link">← 返回目录</a>
+          <div id="article-meta-top" class="article-meta-top">
+            <span id="article-category" class="article-category"></span>
+            <span class="article-date">
+              <span id="article-date"></span>
+            </span>
+          </div>
+          <h1 id="article-title" class="article-title"></h1>
+          <p id="article-description" class="article-description"></p>
+          <div id="article-tags" class="article-tags"></div>
+          <div class="article-stats">
+            <span class="stat-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              <span id="view-count-display">0</span>
+            </span>
+            <span class="stat-item like-button" id="like-button">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+              </svg>
+              <span id="like-count-display">0</span>
+            </span>
+          </div>
+        </div>
+      </header>
+      <div id="article-meta-bar" class="article-meta-bar" style="display: none;">
+        <span id="article-weather" class="meta-item weather" style="display: none;"></span>
+        <span id="article-mood" class="meta-item mood" style="display: none;"></span>
+      </div>
+      <div class="article-body">
+        <div id="article-body-content" class="prose-custom"></div>
+      </div>
+    </div>
+    <div id="article-error" class="article-error" style="display: none;">
+      <p>文章加载失败</p>
+    </div>
+  </article>
+
+  <style>
+    .not-found-page {
+      min-height: 60vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 64px 20px;
+    }
+    .not-found-inner {
+      text-align: center;
+    }
+    .not-found-icon {
+      font-size: 3rem;
+      color: var(--color-accent-primary);
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+    .not-found-title {
+      font-family: "Noto Serif SC", "Source Han Serif SC", serif;
+      font-size: 5rem;
+      font-weight: 300;
+      color: var(--color-text-secondary);
+      margin: 0 0 12px 0;
+      letter-spacing: 0.1em;
+    }
+    .not-found-desc {
+      color: var(--color-text-tertiary);
+      font-size: 1rem;
+      margin-bottom: 32px;
+    }
+    .back-home-btn {
+      display: inline-block;
+      padding: 12px 32px;
+      border: 1px solid var(--color-accent-primary);
+      color: var(--color-accent-primary);
+      text-decoration: none;
+      border-radius: 6px;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .back-home-btn:hover {
+      background: var(--color-accent-primary);
+      color: white;
+    }
+    .article-loading, .article-error {
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--color-text-tertiary);
+    }
+    .article-page {
+      max-width: 100%;
+    }
+  </style>
+
+  <script is:inline>
+    // 检测是否是 /blog/xxx 路径，如果是，尝试从 Supabase 动态加载文章
+    (function() {
+      const path = window.location.pathname;
+      const match = path.match(/^\/blog\/([^\/]+)\/?$/);
+      if (!match) return;
+
+      const slug = match[1];
+
+      // 从 meta 标签读取 Supabase 配置
+      function getSupabaseConfig() {
+        const urlMeta = document.querySelector('meta[name="x-supabase-url"]');
+        const keyMeta = document.querySelector('meta[name="x-supabase-anon-key"]');
+        if (!urlMeta || !keyMeta || !urlMeta.content || !keyMeta.content) {
+          return null;
+        }
+        return { url: urlMeta.content, anonKey: keyMeta.content };
+      }
+
+      const config = getSupabaseConfig();
+      if (!config) return;
+
+      // 加载 marked 用于渲染 Markdown
+      const markedScript = document.createElement('script');
+      markedScript.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
+      markedScript.onload = function() {
+        loadArticle(slug, config);
+      };
+      document.head.appendChild(markedScript);
+    })();
+
+    async function loadArticle(slug, config) {
+      // 动态加载 supabase
+      if (!window.supabase) {
+        await new Promise((resolve) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+          script.onload = resolve;
+          document.head.appendChild(script);
+        });
+      }
+
+      const supabase = window.supabase.createClient(config.url, config.anonKey);
+
+      // 显示文章区域，隐藏 404
+      document.getElementById('not-found-container').style.display = 'none';
+      document.getElementById('dynamic-article').style.display = 'block';
+
+      try {
+        const { data: post, error } = await supabase
+          .from('blog_posts')
+          .select('*')
+          .eq('slug', slug)
+          .eq('status', 'published')
+          .single();
+
+        if (error || !post) {
+          throw error || new Error('文章不存在');
+        }
+
+        renderArticle(post, supabase);
+      } catch (err) {
+        console.error('加载文章失败:', err);
+        document.getElementById('article-loading').style.display = 'none';
+        document.getElementById('article-error').style.display = 'block';
+      }
+    }
+
+    function renderArticle(post, supabase) {
+      document.getElementById('article-loading').style.display = 'none';
+      document.getElementById('article-content-wrap').style.display = 'block';
+
+      // 设置标题
+      document.title = post.title + ' - Charlie的电子骨灰盒';
+
+      // 封面图
+      if (post.cover_image) {
+        document.getElementById('article-cover-wrap').style.display = 'block';
+        document.getElementById('article-cover-img').src = post.cover_image;
+        document.getElementById('article-cover-img').alt = post.title;
+      }
+
+      // 分类和日期
+      if (post.category) {
+        document.getElementById('article-category').textContent = post.category;
+      }
+      if (post.pub_date) {
+        const date = new Date(post.pub_date);
+        document.getElementById('article-date').textContent =
+          date.getFullYear() + '年' + (date.getMonth() + 1) + '月' + date.getDate() + '日';
+      }
+
+      // 标题和描述
+      document.getElementById('article-title').textContent = post.title;
+      document.getElementById('article-description').textContent = post.description || '';
+
+      // 标签
+      if (post.tags && post.tags.length > 0) {
+        const tagsContainer = document.getElementById('article-tags');
+        tagsContainer.innerHTML = post.tags.map(tag =>
+          '<span class="tag-item">#' + tag + '</span>'
+        ).join('');
+      }
+
+      // 浏览量
+      document.getElementById('view-count-display').textContent = post.view_count || 0;
+
+      // 点赞数
+      const likeCount = post.like_count || 0;
+      document.getElementById('like-count-display').textContent = likeCount;
+
+      // 天气心情
+      if (post.weather || post.mood) {
+        document.getElementById('article-meta-bar').style.display = 'flex';
+        if (post.weather) {
+          const el = document.getElementById('article-weather');
+          el.style.display = '';
+          el.textContent = '☀️ ' + post.weather;
+        }
+        if (post.mood) {
+          const el = document.getElementById('article-mood');
+          el.style.display = '';
+          el.textContent = '💭 ' + post.mood;
+        }
+      }
+
+      // 正文内容
+      const contentHtml = window.marked.parse(post.content || '', { breaks: true, gfm: true });
+      document.getElementById('article-body-content').innerHTML = contentHtml;
+
+      // 增加浏览量
+      try {
+        supabase.rpc('increment_view_count', { post_slug: post.slug });
+      } catch (e) {}
+
+      // 点赞功能
+      const likeBtn = document.getElementById('like-button');
+      likeBtn.setAttribute('data-post-id', post.id);
+      likeBtn.addEventListener('click', async function() {
+        const visitorId = getVisitorId();
+        const postId = post.id;
+
+        try {
+          // 检查是否已点赞
+          const { data: existing } = await supabase
+            .from('post_likes')
+            .select('id')
+            .eq('post_id', postId)
+            .eq('visitor_id', visitorId)
+            .maybeSingle();
+
+          if (existing) {
+            // 取消点赞
+            await supabase.from('post_likes').delete().eq('id', existing.id);
+            await supabase.rpc('decrement_like_count', { post_id_param: postId });
+            likeBtn.classList.remove('liked');
+            const countEl = document.getElementById('like-count-display');
+            countEl.textContent = Math.max((parseInt(countEl.textContent) || 1) - 1, 0);
+          } else {
+            // 点赞
+            await supabase.from('post_likes').insert({
+              post_id: postId,
+              visitor_id: visitorId
+            });
+            await supabase.rpc('increment_like_count', { post_id_param: postId });
+            likeBtn.classList.add('liked');
+            const countEl = document.getElementById('like-count-display');
+            countEl.textContent = (parseInt(countEl.textContent) || 0) + 1;
+          }
+        } catch (err) {
+          console.error('点赞操作失败:', err);
+        }
+      });
+    }
+
+    function getVisitorId() {
+      let id = localStorage.getItem('visitor_id');
+      if (!id) {
+        id = 'v_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('visitor_id', id);
+      }
+      return id;
+    }
+  </script>
+</Layout>
